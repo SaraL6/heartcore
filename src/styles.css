@@ -64,7 +64,7 @@ main { max-width: 1320px; margin: 0 auto; padding: 18px 20px 60px; min-height: 7
 .page-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin: 10px 0 14px; }
 .page-title h1 { font: italic 28px var(--display); margin: 0; }
 .page-title > span { color: var(--muted); }
-.page-title > :last-child:not(span) { margin-left: auto; }
+.page-title > :last-child:not(span):not(h1) { margin-left: auto; }
 .empty { text-align: center; color: var(--muted); padding: 70px 0; font: italic 16px var(--display); }
 .foot { text-align: center; color: var(--muted); font-size: 12px; padding: 24px 20px 32px; }
 
@@ -72,11 +72,11 @@ main { max-width: 1320px; margin: 0 auto; padding: 18px 20px 60px; min-height: 7
 .grid { columns: 5 220px; column-gap: 14px; }
 .card { break-inside: avoid; margin: 0 0 14px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .card-media { display: block; width: 100%; padding: 0; border: 0; border-radius: 0; cursor: zoom-in; }
-.card-media > *, .post-media > svg, .post-media > img { display: block; width: 100%; height: auto; }
+.card-media > img, .post-media > img { display: block; width: 100%; height: auto; }
+.card-media > img { background: var(--chip); min-height: 60px; }
 .card-media:hover { filter: brightness(1.05) saturate(1.05); }
 .card footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 6px 6px 10px; font-size: 12px; }
 .author { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.media-missing { padding: 40px 10px; text-align: center; color: var(--muted); }
 
 .heart-btn { display: inline-flex; align-items: center; gap: 5px; border: 0; padding: 4px 6px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .heart-btn.on { color: var(--accent); }
@@ -135,7 +135,30 @@ aside h4 { margin: 8px 0 0; font-size: 11px; letter-spacing: 1.5px; text-transfo
 .mosaic { display: grid; grid-template: 1fr 1fr / 2fr 1fr; gap: 3px; aspect-ratio: 3 / 2; border-radius: var(--radius); overflow: hidden; margin-bottom: 6px; }
 .mosaic > div { background: var(--chip); overflow: hidden; }
 .mosaic > div:first-child { grid-row: span 2; }
-.mosaic svg, .mosaic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mosaic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.link { border: 0; padding: 4px 0; color: var(--muted); }
+.muted { color: var(--muted); margin: 0; }
+.underline { text-decoration: underline; }
+.credit { margin: 0; padding-right: 24px; color: var(--muted); font-size: 13px; }
+.credit strong { color: var(--ink); }
+.notice { margin: 0; padding: 10px 12px; background: var(--chip); border-radius: var(--radius); }
+.empty button, .empty .primary { margin-top: 12px; font: 14px var(--font); }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 20; max-width: calc(100vw - 32px); background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 99px; box-shadow: 0 6px 24px #0005; }
+.tabs { display: flex; justify-content: center; gap: 22px; border-bottom: 1px solid var(--line); margin-bottom: 18px; }
+.page-title + .tabs { justify-content: flex-start; }
+.tabs a { padding: 8px 0; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabs a[aria-current] { color: var(--ink); border-color: var(--accent); }
+.follow { border-radius: 99px; padding: 6px 16px; white-space: nowrap; }
+.follow.on { color: var(--muted); }
+.profile h1 { font: italic 28px var(--display); margin: 4px 0 0; }
+.profile .bio { margin: 0; color: var(--muted); max-width: 480px; }
+.people-search { display: block; width: min(420px, 100%); margin: 0 0 14px; border-radius: 99px; padding-left: 14px; }
+.people { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+.people li { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); }
+.people .who { flex: 1; min-width: 0; display: grid; }
+.people small { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inline-form.narrow { max-width: 360px; margin-bottom: 18px; }
 
 @media (max-width: 720px) {
   .top { padding: 10px 12px; }

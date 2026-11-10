@@ -1,180 +1,187 @@
 import { useSyncExternalStore } from 'react'
-import type { ArtKind, ArtSpec } from './art'
+import { createClient } from '@supabase/supabase-js'
 
 export type Theme = 'pastel' | 'grunge' | 'galaxy'
-export type Post = {
-  id: string
-  author: string
+
+// One picture, wherever it came from. `id` is set once it exists in our
+// database; `key` identifies it either way (so we know what you've hearted
+// while browsing the outside image library).
+export type Img = {
+  id?: string
+  key: string
+  provider: string // 'upload' or the name of an image API
+  providerId?: string
+  url: string
+  thumb?: string
+  width?: number
+  height?: number
   caption: string
   tags: string[]
-  baseHearts: number
-  createdAt: number
-  art?: ArtSpec // built-in procedural artwork
-  src?: string // remote image URL
-  // otherwise: an uploaded file stored in IndexedDB under the post id
+  credit?: string
+  sourceUrl?: string
+  license?: string
+  uploader?: { id: string; username: string }
+  heartCount: number
+  via?: string // "hearted by" username, in the friends feed
 }
-export type Collection = { id: string; name: string; postIds: string[] }
-type Saved = {
-  profile: { name: string; bio: string; theme: Theme }
-  posts: Post[] // only the user's own posts; the starter feed is generated
-  hearts: string[] // newest first
-  collections: Collection[]
-}
-type State = Saved & { blobs: Record<string, string> } // post id -> object URL
+export type Profile = { id: string; username: string; bio: string }
+export type Collection = { id: string; name: string; userId: string; images: Img[] }
 
-// ---------- starter feed ----------
+const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
+const anon = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
+export const supabase = url && anon ? createClient(url, anon) : null
 
-const AUTHORS = ['moonchild_', 'tea.and.rain', 'xo-lena', 'paperplanes', 'wildflwr', 'indigo.kid', 'stardustt', 'coffee.and.converse']
-const QUOTES = [
-  'stay weird', 'good vibes only', 'but first, coffee', 'normal people scare me', 'made of stardust',
-  'too rad to be sad', 'lost in the right direction', 'the moon made me do it', 'reality called so i hung up',
-  'five more minutes', 'idk. idc.', 'meet me at midnight', 'pizza is my soulmate', 'forever young',
-]
-const WORDS = ['wanderlust', 'infinity', 'dreamer', 'young', 'wild', 'nope', 'hipster', '']
-const NOTES = ["summer '12", 'best day ever', 'road trip', 'us ♥', 'take me back', 'the lake']
-const MOONS = ['goodnight', 'sweet dreams', 'la lune', 'night owl', '']
-const TAGS: Record<ArtKind, string[]> = {
-  galaxy: ['galaxy', 'space', 'hipster', 'grunge'],
-  quote: ['quotes', 'typography', 'words', 'text'],
-  sunset: ['sunset', 'sky', 'travel', 'summer'],
-  pattern: ['pattern', 'wallpaper', 'cute', 'pastel'],
-  polaroid: ['polaroid', 'vintage', 'memories', 'summer'],
-  moon: ['moon', 'night', 'stars', 'dreamy'],
-}
-const ORDER: ArtKind[] = ['galaxy', 'quote', 'sunset', 'quote', 'pattern', 'polaroid', 'moon', 'quote']
-
-export const SEEDS: Post[] = Array.from({ length: 56 }, (_, i) => {
-  const kind = ORDER[i % ORDER.length]
-  const n = Math.floor(i / ORDER.length) + i
-  const text =
-    kind === 'quote' ? QUOTES[n % QUOTES.length]
-    : kind === 'galaxy' ? WORDS[n % WORDS.length]
-    : kind === 'polaroid' ? NOTES[n % NOTES.length]
-    : kind === 'moon' ? MOONS[n % MOONS.length]
-    : undefined
-  const tags = TAGS[kind]
-  return {
-    id: `seed-${i}`,
-    author: AUTHORS[(i * 5 + 3) % AUTHORS.length],
-    caption: text ?? '',
-    tags: [tags[0], tags[1 + (i % (tags.length - 1))]],
-    baseHearts: 12 + ((i * 2654435761) >>> 0) % 4800,
-    createdAt: 0,
-    art: { kind, seed: 1000 + i * 77, text: text || undefined, h: kind === 'quote' ? 200 + (i % 3) * 50 : 260 + ((i * 53) % 200) },
-  }
-})
-
-// ---------- persistence ----------
-
-const KEY = 'heartcore:v1'
-const DEFAULT: Saved = {
-  profile: { name: 'you', bio: 'collecting pretty things since forever ♡', theme: 'pastel' },
-  posts: [], hearts: [], collections: [{ id: 'c-first', name: 'things i love', postIds: [] }],
+type State = {
+  ready: boolean
+  me: Profile | null
+  hearted: Record<string, string> // image key -> image id
+  counts: Record<string, number> // heart counts changed this session
+  following: string[] // profile ids
+  theme: Theme
+  authOpen: boolean
+  toast: string
+  rev: number // bumped when lists should reload (after posting or deleting)
 }
 
-function load(): Saved {
-  try {
-    const raw = localStorage.getItem(KEY)
-    if (raw) return { ...DEFAULT, ...JSON.parse(raw) }
-  } catch { /* corrupted or unavailable storage: start fresh */ }
-  return DEFAULT
+const savedTheme = (() => { try { return localStorage.getItem('heartcore:theme') as Theme | null } catch { return null } })()
+let state: State = {
+  ready: !supabase, me: null, hearted: {}, counts: {}, following: [],
+  theme: savedTheme ?? 'pastel', authOpen: false, toast: '', rev: 0,
 }
-
-let state: State = { ...load(), blobs: {} }
 const listeners = new Set<() => void>()
+const set = (patch: Partial<State>) => { state = { ...state, ...patch }; listeners.forEach((l) => l()) }
+export const getState = () => state
+export const useStore = () => useSyncExternalStore((l) => (listeners.add(l), () => listeners.delete(l)), getState)
 
-function set(patch: Partial<State>) {
-  state = { ...state, ...patch }
-  const { blobs: _blobs, ...saved } = state
-  try { localStorage.setItem(KEY, JSON.stringify(saved)) } catch { /* quota/private mode */ }
-  listeners.forEach((l) => l())
+let toastTimer = 0
+export function toast(message: string) {
+  set({ toast: message })
+  clearTimeout(toastTimer)
+  toastTimer = window.setTimeout(() => set({ toast: '' }), 4000)
 }
 
-export function useStore(): State {
-  return useSyncExternalStore((l) => (listeners.add(l), () => listeners.delete(l)), () => state)
+/* eslint-disable @typescript-eslint/no-explicit-any */
+export const SELECT_IMG = '*, uploader:profiles(id, username)'
+export function toImg(r: any, via?: string): Img {
+  return {
+    id: r.id,
+    key: r.provider === 'upload' ? r.id : `${r.provider}:${r.provider_id}`,
+    provider: r.provider, providerId: r.provider_id ?? undefined,
+    url: r.url, thumb: r.thumb ?? undefined, width: r.width ?? undefined, height: r.height ?? undefined,
+    caption: r.caption ?? '', tags: r.tags ?? [], credit: r.credit ?? undefined,
+    sourceUrl: r.source_url ?? undefined, license: r.license ?? undefined,
+    uploader: r.uploader ?? undefined, heartCount: r.heart_count ?? 0, via,
+  }
 }
 
-// Uploaded files live in IndexedDB (localStorage is far too small for images).
-function db(): Promise<IDBDatabase> {
-  return new Promise((res, rej) => {
-    const req = indexedDB.open('heartcore', 1)
-    req.onupgradeneeded = () => req.result.createObjectStore('images')
-    req.onsuccess = () => res(req.result)
-    req.onerror = () => rej(req.error)
+async function loadMe(userId: string) {
+  if (!supabase) return
+  const [profile, hearts, follows] = await Promise.all([
+    supabase.from('profiles').select('id, username, bio').eq('id', userId).maybeSingle(),
+    supabase.from('hearts').select('image_id, images(provider, provider_id)').eq('user_id', userId),
+    supabase.from('follows').select('following_id').eq('follower_id', userId),
+  ])
+  if (profile.error || !profile.data) {
+    toast('could not load your profile — has the database schema been run?')
+    return set({ ready: true, me: null })
+  }
+  const hearted: Record<string, string> = {}
+  for (const h of (hearts.data ?? []) as any[]) {
+    const i = h.images
+    if (i) hearted[i.provider === 'upload' ? h.image_id : `${i.provider}:${i.provider_id}`] = h.image_id
+  }
+  set({ ready: true, me: profile.data, hearted, following: (follows.data ?? []).map((f: any) => f.following_id) })
+}
+
+export function initAuth() {
+  if (!supabase) return
+  let current: string | null | undefined
+  const apply = (userId: string | null) => {
+    if (userId === current) return
+    current = userId
+    if (userId) loadMe(userId)
+    else set({ ready: true, me: null, hearted: {}, following: [] })
+  }
+  supabase.auth.getSession().then(({ data }) => apply(data.session?.user.id ?? null))
+  // Defer: Supabase calls made directly inside this callback can deadlock.
+  supabase.auth.onAuthStateChange((_e, session) => { setTimeout(() => apply(session?.user.id ?? null), 0) })
+}
+
+/** Make sure a picture from the outside library has a row in our database. */
+export async function ensureSaved(img: Img): Promise<string> {
+  if (img.id) return img.id
+  const { data, error } = await supabase!.rpc('save_external_image', {
+    p_provider: img.provider, p_provider_id: img.providerId, p_url: img.url, p_thumb: img.thumb ?? null,
+    p_width: img.width ?? null, p_height: img.height ?? null, p_caption: img.caption, p_tags: img.tags,
+    p_credit: img.credit ?? null, p_source_url: img.sourceUrl ?? null, p_license: img.license ?? null,
   })
-}
-async function idb<T>(mode: IDBTransactionMode, fn: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  const d = await db()
-  return new Promise((res, rej) => {
-    const req = fn(d.transaction('images', mode).objectStore('images'))
-    req.onsuccess = () => res(req.result)
-    req.onerror = () => rej(req.error)
-  })
+  if (error) throw error
+  img.id = data as string
+  return img.id
 }
 
-export async function loadBlobs() {
-  try {
-    const [keys, vals] = await Promise.all([
-      idb('readonly', (s) => s.getAllKeys()),
-      idb<Blob[]>('readonly', (s) => s.getAll()),
-    ])
-    const blobs: Record<string, string> = {}
-    keys.forEach((k, i) => (blobs[String(k)] = URL.createObjectURL(vals[i])))
-    set({ blobs })
-  } catch (e) { console.warn('could not load uploads', e) }
+/** Returns the signed-in profile, or opens the sign-in dialog and returns null. */
+export function requireMe(): Profile | null {
+  if (!state.me) set({ authOpen: true })
+  return state.me
 }
 
-// ---------- actions ----------
-
-const uid = () => Math.random().toString(36).slice(2, 10)
+export const heartCount = (s: State, img: Img) => s.counts[img.key] ?? img.heartCount
 
 export const actions = {
-  toggleHeart(id: string) {
-    const has = state.hearts.includes(id)
-    set({ hearts: has ? state.hearts.filter((h) => h !== id) : [id, ...state.hearts] })
+  setTheme(theme: Theme) {
+    try { localStorage.setItem('heartcore:theme', theme) } catch { /* private mode */ }
+    set({ theme })
   },
-  setProfile(p: Partial<Saved['profile']>) { set({ profile: { ...state.profile, ...p } }) },
-  async addPost(input: { caption: string; tags: string[]; src?: string; file?: Blob }) {
-    const id = 'p-' + uid()
-    if (input.file) await idb('readwrite', (s) => s.put(input.file!, id))
-    const post: Post = {
-      id, author: state.profile.name, caption: input.caption, tags: input.tags,
-      baseHearts: 0, createdAt: Date.now(), src: input.src,
+  openAuth: (open: boolean) => set({ authOpen: open }),
+  refresh: () => set({ rev: state.rev + 1 }),
+  setMe: (me: Profile) => set({ me }),
+  noteCounts(found: { key: string; id: string; heartCount: number }[]) {
+    // Called after looking up which library results people here already hearted.
+    const counts = { ...state.counts }
+    for (const f of found) if (!(f.key in counts)) counts[f.key] = f.heartCount
+    set({ counts })
+  },
+  async toggleHeart(img: Img) {
+    const me = requireMe()
+    if (!me || !supabase) return
+    const was = state.hearted[img.key]
+    if (was === 'pending') return // the previous tap is still saving
+    const before = { hearted: state.hearted, counts: state.counts }
+    const n = heartCount(state, img)
+    // Show the change right away; undo it if the server says no.
+    const hearted = { ...state.hearted }
+    if (was) delete hearted[img.key]; else hearted[img.key] = img.id ?? 'pending'
+    set({ hearted, counts: { ...state.counts, [img.key]: Math.max(0, n + (was ? -1 : 1)) } })
+    try {
+      if (was) {
+        const { error } = await supabase.from('hearts').delete().eq('user_id', me.id).eq('image_id', was)
+        if (error) throw error
+      } else {
+        const id = await ensureSaved(img)
+        const { error } = await supabase.from('hearts').insert({ user_id: me.id, image_id: id })
+        if (error && error.code !== '23505') throw error // already hearted is fine
+        if (state.hearted[img.key]) set({ hearted: { ...state.hearted, [img.key]: id } })
+      }
+    } catch (e) {
+      console.error(e)
+      set(before)
+      toast('that heart did not save — check your connection and try again')
     }
-    set({
-      posts: [post, ...state.posts],
-      blobs: input.file ? { ...state.blobs, [id]: URL.createObjectURL(input.file) } : state.blobs,
-    })
-    return id
   },
-  deletePost(id: string) {
-    idb('readwrite', (s) => s.delete(id)).catch(() => {})
-    if (state.blobs[id]) URL.revokeObjectURL(state.blobs[id])
-    const { [id]: _gone, ...blobs } = state.blobs
-    set({
-      posts: state.posts.filter((p) => p.id !== id),
-      hearts: state.hearts.filter((h) => h !== id),
-      collections: state.collections.map((c) => ({ ...c, postIds: c.postIds.filter((p) => p !== id) })),
-      blobs,
-    })
+  async toggleFollow(profileId: string) {
+    const me = requireMe()
+    if (!me || !supabase) return
+    const was = state.following.includes(profileId)
+    const before = state.following
+    set({ following: was ? before.filter((f) => f !== profileId) : [...before, profileId] })
+    const q = was
+      ? supabase.from('follows').delete().eq('follower_id', me.id).eq('following_id', profileId)
+      : supabase.from('follows').insert({ follower_id: me.id, following_id: profileId })
+    const { error } = await q
+    if (error && error.code !== '23505') { set({ following: before }); toast('could not update follow — try again') }
   },
-  addCollection(name: string) {
-    const c = { id: 'c-' + uid(), name, postIds: [] }
-    set({ collections: [...state.collections, c] })
-    return c.id
-  },
-  renameCollection(id: string, name: string) {
-    set({ collections: state.collections.map((c) => (c.id === id ? { ...c, name } : c)) })
-  },
-  deleteCollection(id: string) { set({ collections: state.collections.filter((c) => c.id !== id) }) },
-  toggleInCollection(cid: string, pid: string) {
-    set({
-      collections: state.collections.map((c) =>
-        c.id !== cid ? c : { ...c, postIds: c.postIds.includes(pid) ? c.postIds.filter((p) => p !== pid) : [pid, ...c.postIds] }),
-    })
-  },
+  async signOut() { await supabase?.auth.signOut() },
 }
 
-export const allPosts = (s: State) => [...s.posts, ...SEEDS]
-export const isMine = (p: Post) => p.id.startsWith('p-')
 export const fmt = (n: number) => (n >= 1000 ? (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(n))
