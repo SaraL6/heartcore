@@ -138,7 +138,7 @@ function Discover({ q, isTag, onOpen }: { q: string; isTag: boolean; onOpen: Ope
     } catch (e) {
       console.error(e)
       setMore(false)
-      setError(e instanceof TypeError ? "couldn't reach the image library — check your connection" : (e as Error).message)
+      setError((e as Error).message)
     }
     busy.current = false
     setLoading(false)

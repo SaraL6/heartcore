@@ -15,7 +15,14 @@ type OvImage = {
 export async function searchImages(q: string, page: number): Promise<{ items: Img[]; hasMore: boolean }> {
   const u = new URL(API)
   u.search = new URLSearchParams({ q, page: String(page), page_size: String(PAGE_SIZE), source: 'flickr' }).toString()
-  const res = await fetch(u)
+  // The library can be slow and times out now and then; one quiet retry usually does it.
+  const attempt = () => fetch(u, { signal: AbortSignal.timeout(30_000) }).catch(() => null)
+  let res = await attempt()
+  if (!res || res.status >= 500) {
+    await new Promise((r) => setTimeout(r, 1500))
+    res = await attempt()
+  }
+  if (!res) throw new Error("couldn't reach the image library — check your connection")
   if (res.status === 429) throw new Error('the image library is rate-limiting us — give it a minute and try again')
   if (!res.ok) throw new Error(`the image library answered with an error (${res.status})`)
   const data: { results: OvImage[]; page_count?: number } = await res.json()
