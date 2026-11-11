@@ -22,7 +22,6 @@ export function useLoad<T>(fn: () => Promise<T>, deps: unknown[]) {
       (e) => { console.error(e); if (live) setState({ error: errorText(e), loading: false }) },
     )
     return () => { live = false }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps)
   return state
 }

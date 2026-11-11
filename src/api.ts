@@ -1,6 +1,5 @@
 import { PROFILE_COLS, SELECT_IMG, ensureSaved, supabase, toImg, type Collection, type Img, type Profile } from './store'
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 // All database reads and writes that aren't part of the signed-in session state.
 
 function ok<T>(res: { data: T; error: unknown }): T {
@@ -112,8 +111,8 @@ export async function setCover(id: string, url: string | null) { ok(await db().f
 
 // ---------- take your things with you ----------
 
-const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
-const safeUrl = (u?: string) => (u && /^https?:\/\//i.test(u) ? esc(u) : '#')
+export const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+export const safeUrl = (u?: string) => (u && /^https?:\/\//i.test(u) ? esc(u) : '#')
 
 /** Everything you've hearted, posted and collected, as one web page you can keep. */
 export async function exportEverything(me: Profile): Promise<Blob> {

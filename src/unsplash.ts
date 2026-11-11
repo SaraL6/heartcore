@@ -9,7 +9,6 @@ export const unsplashEnabled = !!KEY
 const REF = '?utm_source=heartcore&utm_medium=referral'
 const pings = new Map<string, string>() // photo id -> "download" tracking URL
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export async function searchUnsplash(q: string, page: number): Promise<{ items: Img[]; hasMore: boolean }> {
   const u = new URL('https://api.unsplash.com/search/photos')
   u.search = new URLSearchParams({ query: q, page: String(page), per_page: '30', content_filter: 'high' }).toString()

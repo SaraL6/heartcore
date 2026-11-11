@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as api from './api'
 import { AuthModal, FollowButton, Grid, HeartIcon, Media, PostModal, UploadModal, useLoad } from './components'
 import { LEGAL_LINKS, LegalPage } from './legal'
+import { MUSIC_REF, MusicPlayer } from './music'
 import { LIBRARY, searchImages } from './images'
 import { actions, initAuth, requireMe, supabase, toast, useStore, type Collection, type Img, type Profile, type Theme } from './store'
 
@@ -67,6 +68,8 @@ export default function App() {
             ? <a href={meHref} aria-current={current === 'me' ? 'page' : undefined}>me</a>
             : <button className="link" onClick={() => actions.openAuth(true)}>sign in</button>}
         </nav>
+        <button className="music-btn" aria-pressed={s.musicOpen} aria-label="Music player" title="music"
+          onClick={() => actions.setMusicOpen(!s.musicOpen)}>♫</button>
         <div className="themes" role="group" aria-label="Theme">
           {THEMES.map((t) => (
             <button key={t.id} className={`swatch ${t.id}`} title={t.label} aria-label={`${t.label} theme`}
@@ -87,6 +90,7 @@ export default function App() {
       {open && <PostModal img={open} onClose={() => setOpen(null)} />}
       {uploading && <UploadModal onClose={() => setUploading(false)} />}
       {s.authOpen && <AuthModal />}
+      <MusicPlayer />
       {s.toast && <div className="toast" role="status">{s.toast}</div>}
     </>
   )
@@ -157,7 +161,7 @@ function Discover({ q, isTag, onOpen }: { q: string; isTag: boolean; onOpen: Ope
     setLoading(false)
   }
 
-  useEffect(() => { load(1) }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(1) }, [])
   useEffect(() => {
     const el = sentinel.current
     if (!el || !more || loading) return
@@ -261,7 +265,7 @@ function ProfilePage({ username, tab, onOpen }: { username: string; tab: string;
   const [exporting, setExporting] = useState(false)
   const mine = !!p && me?.id === p.id
   const [bio, setBio] = useState('')
-  useEffect(() => { if (p) setBio(p.bio) }, [p?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (p) setBio(p.bio) }, [p?.id])
 
   if (!supabase) return <NeedAccounts what="" />
   if (!head.data) return head.loading || head.error ? <Status loading={head.loading} error={head.error} /> : <p className="empty">there's nobody called “{username}” here.</p>
@@ -299,6 +303,9 @@ function ProfilePage({ username, tab, onOpen }: { username: string; tab: string;
               onChange={(e) => setBio(e.target.value)} onBlur={saveBio} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
           : profile.bio && <p className="bio">{profile.bio}</p>}
         <p className="stats"><span><b>{followers}</b> followers</span><span><b>{followingCount}</b> following</span></p>
+        {profile.music && MUSIC_REF.test(profile.music) && (
+          <button className="follow" onClick={() => actions.setMusic(profile.music!)}>♫ play {mine ? 'my' : `${profile.username}'s`} music</button>
+        )}
         {mine && !profile.cover_url && <p className="muted small">tip: open any image and choose “use as my profile cover” · your theme is what visitors see</p>}
         {mine ? (
           <p className="account-links">

@@ -319,3 +319,10 @@ end $$;
 drop trigger if exists images_removed_covers on public.images;
 create trigger images_removed_covers after insert or update of removed on public.images
   for each row when (new.removed) execute function public.clear_removed_covers();
+
+-- ---------- profile music ----------
+-- A Spotify playlist, album, track, artist, show or episode, stored as "type/id"
+-- (never a free-form URL), that visitors can play from someone's profile.
+alter table public.profiles add column if not exists music text
+  check (music is null or music ~ '^(playlist|album|track|artist|show|episode)/[A-Za-z0-9]{22}$');
+grant update (username, bio, cover_url, theme, music) on public.profiles to authenticated;

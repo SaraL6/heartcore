@@ -1,37 +1,99 @@
 # heartcore ♥
 
-A cozy, nostalgic place to heart and collect images — a love letter to the
-image-bookmarking sites of the Tumblr era (2010–2014).
+[![CI](https://github.com/SaraL6/weheartit-clone/actions/workflows/ci.yml/badge.svg)](https://github.com/SaraL6/weheartit-clone/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-ff5c8a.svg)](LICENSE)
 
-**No ads, no tracking, no algorithm deciding what you see.** Friends' hearts
-show up in the order they happened, and that's it.
+**An ad-free place to heart and collect images, built for everyone who misses the Tumblr era.**
 
-## What's in it
+**[Try the live demo →](https://heartcore-tau.vercel.app/)**
 
-- **Discover** — endless scroll of real photos from [Openverse](https://openverse.org)
-  (openly licensed Flickr photos, no API key needed), with search and tags
-- **Hearts** — heart anything; double-click an open image for the big heart
-- **Collections** — save images into as many collections as you like
-- **Post** — upload a jpg/png/gif or paste an image link, with caption and tags
-- **Friends** — follow people, see what they heart, browse what everyone is hearting
-- **Profiles** — hearts, posts, collections, bio, follower counts
-- **Your canvas** — pick any image as your profile cover, and your theme is
-  what visitors see when they open your page
-- **Themes** — pastel, soft grunge, galaxy, vintage and daydream
-- **Take it with you** — "download everything" saves all your hearts, posts
-  and collections as one web page, so they can never vanish
-- **Human-made only** — no AI-generated images, and a report reason for them
-- **No numbers if you like** — hide heart counts everywhere with one click
-- **Safety** — report button, moderation queue, takedowns, account deletion
+![The discover feed](docs/screenshots/discover.jpg)
 
-Without a Supabase project the site still works as a browse-only gallery.
-Hearts, collections, posting and following need accounts — set them up below.
+## Why I built it
 
-## Run it
+In high school I had thousands of images saved on an image-bookmarking site I
+loved. It shut down and all of it went with it. The big alternatives are now
+full of ads, AI-generated images and feeds decided by an algorithm. heartcore is
+the opposite: a quiet, pretty place to collect things you love, follow friends,
+and take everything with you whenever you want.
+
+## What it does
+
+- **Discover** — endless scroll of real photos with search and tags, from
+  Unsplash or Openverse
+- **Hearts and collections** — heart anything, organise it into collections
+- **Post** — upload a jpg/png/gif or share an image link, with caption and tags
+- **Friends** — follow people and see what they heart, in the order it happened
+- **Your canvas** — pick any image as your profile cover; visitors see your
+  page in the theme you chose (pastel, soft grunge, galaxy, vintage, daydream)
+- **Music** — paste a Spotify link to listen while you browse, and put a
+  playlist on your profile for visitors to play
+- **Take it with you** — "download everything" saves your hearts, posts and
+  collections as one web page, so they can never vanish
+- **Human-made only** — no AI-generated images; no ads; no tracking; heart
+  counts can be hidden
+- **Safety built in** — report button on every image, a moderation queue,
+  takedowns, rules and privacy pages, account deletion
+
+| | |
+| --- | --- |
+| ![A profile with a cover image, in the daydream theme](docs/screenshots/profile.jpg) | ![The friends feed, in the soft grunge theme](docs/screenshots/friends.jpg) |
+| A profile, dressed in its owner's theme | The friends feed |
+| ![An open image with collections and credit](docs/screenshots/image.jpg) | <img src="docs/screenshots/phone.jpg" alt="Discover on a phone, in the galaxy theme" width="260"> |
+| Saving to a collection, with photographer credit | On a phone |
+
+## How it's built
+
+**React 18 · TypeScript · Vite · Supabase (Postgres, Auth, Storage) · Vitest · GitHub Actions**
+
+There is no custom server: the browser talks straight to Postgres through
+Supabase, so the database itself has to enforce who can do what.
+
+- **Security lives in the database.** Every table has row-level security: you
+  can read what's public and change only what's yours. Heart counts are kept
+  by a trigger and can't be written by clients. The few privileged actions
+  (saving a library image once, resolving a report, deleting an account) are
+  narrow `security definer` functions. See [`supabase/schema.sql`](supabase/schema.sql).
+- **Those rules are tested.** [`supabase/tests/rules.test.sql`](supabase/tests/rules.test.sql)
+  runs 40 checks against a real Postgres in CI — for example that you can't
+  heart as someone else, forge a count, read reports, or make yourself an admin.
+- **Instant-feeling UI.** Hearts and follows update immediately and roll back
+  if the server refuses.
+- **One image model, several sources.** Library photos and member uploads
+  share one shape, and a library photo is only written to the database the
+  first time someone hearts or saves it. Image sources are swappable modules.
+- **Untrusted input is treated as untrusted.** Spotify links are reduced to a
+  validated `type/id` before a player is ever created, the exported page
+  escapes every caption, and uploads are resized in the browser.
+- **Moderation is part of the design**, not an afterthought: takedowns also
+  hide library photos, clear profile covers and close duplicate reports.
+
+| File | What it does |
+| --- | --- |
+| `src/store.ts` | Signed-in state: who you are, what you've hearted, who you follow. |
+| `src/api.ts` | Every other database read and write, and the export. |
+| `src/images.ts`, `src/openverse.ts`, `src/unsplash.ts` | Image search: Unsplash if a key is set, otherwise Openverse. |
+| `src/music.tsx` | The Spotify mini player. |
+| `src/App.tsx`, `src/components.tsx` | Pages and building blocks. |
+| `src/legal.tsx` | Rules, terms, privacy and copyright pages. |
+| `supabase/schema.sql` | Tables, access rules, triggers, storage, reports and moderation. |
+| `supabase/tests/` | Access-rule tests and the stand-ins needed to run them on plain Postgres. |
+
+## Run it locally
 
 ```bash
 npm install
-npm run dev
+npm run dev      # the site, browse-only until Supabase is connected
+npm test         # unit tests
+npm run build    # type-check and production build
+```
+
+Database tests, against any local Postgres:
+
+```bash
+createdb heartcore_test
+psql -d heartcore_test -v ON_ERROR_STOP=1 -q \
+  -f supabase/tests/stubs.sql -f supabase/schema.sql -f supabase/tests/rules.test.sql
 ```
 
 ## Set up accounts (Supabase, about 5 minutes)
@@ -43,7 +105,7 @@ npm run dev
 3. Open **Project Settings → API** and copy the **Project URL** and the
    **anon public** key.
 4. Copy `.env.example` to `.env.local`, paste the two values in, and restart
-   `npm run dev`.
+   `npm run dev`. Optionally add `VITE_UNSPLASH_ACCESS_KEY` to use Unsplash.
 
 Good to know:
 
@@ -90,18 +152,17 @@ sign-up, and account deletion — but some things only the operator can do:
 Cloudflare Pages or GitHub Pages. Set `VITE_SUPABASE_URL` and
 `VITE_SUPABASE_ANON_KEY` as build environment variables there.
 
-## How it's put together
+## What's next
 
-| File | What it does |
-| --- | --- |
-| `src/images.ts`, `src/openverse.ts`, `src/unsplash.ts` | Image search: Unsplash if `VITE_UNSPLASH_ACCESS_KEY` is set, otherwise Openverse. |
-| `src/store.ts` | Signed-in state: who you are, what you've hearted, who you follow. |
-| `src/api.ts` | Every other database read and write. |
-| `src/App.tsx`, `src/components.tsx` | Pages and building blocks. |
-| `src/legal.tsx` | Rules, terms, privacy and copyright pages. |
-| `supabase/schema.sql` | Tables, access rules, triggers, storage, reports and moderation. |
+- Postcards: send an image to a friend with a note
+- A collage maker for moodboards and wallpapers
+- "On this day": what you hearted a year ago
 
-Photos shown in Discover belong to their creators and are shared under
-Creative Commons licenses; each image links back to its original and license.
+## Credits
 
-Built with Vite, React, TypeScript and Supabase.
+Photos shown in Discover and in the screenshots above belong to their
+creators and are shared under Creative Commons licenses (via
+[Openverse](https://openverse.org)) or the Unsplash License; each image in the
+app links back to its original. The code is [MIT licensed](LICENSE).
+
+Built with AI pair-programming ([Claude Code](https://claude.com/claude-code)).
