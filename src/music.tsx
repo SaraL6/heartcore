@@ -63,6 +63,14 @@ export function MusicPlayer() {
           {error && <p className="error" role="alert">{error}</p>}
           {!valid && <p className="muted small">In Spotify: Share → Copy link, on any playlist, album or song.</p>}
           {valid && me && me.music !== valid && <button className="link" onClick={pin}>put this on my profile</button>}
+          {valid && (
+            <p className="muted small">
+              Only hearing 30-second previews? Spotify plays full songs here only if you're logged in at{' '}
+              <a className="underline" href="https://open.spotify.com" target="_blank" rel="noreferrer noopener">open.spotify.com</a>{' '}
+              in this browser and the browser lets this site use Spotify's sign-in. Or{' '}
+              <a className="underline" href={`https://open.spotify.com/${valid}`} target="_blank" rel="noreferrer noopener">open it in Spotify</a>.
+            </p>
+          )}
         </div>
       )}
     </aside>
