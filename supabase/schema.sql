@@ -326,3 +326,76 @@ create trigger images_removed_covers after insert or update of removed on public
 alter table public.profiles add column if not exists music text
   check (music is null or music ~ '^(playlist|album|track|artist|show|episode)/[A-Za-z0-9]{22}$');
 grant update (username, bio, cover_url, theme, music) on public.profiles to authenticated;
+
+-- ---------- profile extras: mood, colour, visit counter, top friends, guestbook ----------
+
+alter table public.profiles add column if not exists mood text check (mood is null or char_length(mood) <= 60);
+alter table public.profiles add column if not exists accent text check (accent is null or accent ~ '^#[0-9a-f]{6}$');
+alter table public.profiles add column if not exists views int not null default 0;
+-- "views" is deliberately not in this list: only the function below changes it.
+grant update (username, bio, cover_url, theme, music, mood, accent) on public.profiles to authenticated;
+
+-- Count a visit to someone's profile (your own visits don't count).
+create or replace function public.bump_profile_views(p_profile uuid) returns int
+language sql security definer set search_path = public as $$
+  update public.profiles set views = views + 1
+  where id = p_profile and id is distinct from auth.uid()
+  returning views
+$$;
+grant execute on function public.bump_profile_views to anon, authenticated;
+
+-- Up to eight people you choose to show off on your profile.
+create table if not exists public.top_friends (
+  user_id uuid not null references public.profiles on delete cascade,
+  friend_id uuid not null references public.profiles on delete cascade,
+  position smallint not null check (position between 1 and 8),
+  primary key (user_id, friend_id),
+  unique (user_id, position),
+  check (user_id <> friend_id)
+);
+alter table public.top_friends enable row level security;
+drop policy if exists "read top friends" on public.top_friends;
+create policy "read top friends" on public.top_friends for select using (true);
+drop policy if exists "manage own top friends" on public.top_friends;
+create policy "manage own top friends" on public.top_friends for all to authenticated
+  using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+-- Short notes people leave on each other's profiles.
+create table if not exists public.guestbook (
+  id uuid primary key default gen_random_uuid(),
+  profile_id uuid not null references public.profiles on delete cascade,
+  author_id uuid not null references public.profiles on delete cascade,
+  body text not null check (char_length(btrim(body)) between 1 and 300),
+  created_at timestamptz not null default now()
+);
+create index if not exists guestbook_profile_idx on public.guestbook (profile_id, created_at desc);
+alter table public.guestbook enable row level security;
+drop policy if exists "read guestbook" on public.guestbook;
+create policy "read guestbook" on public.guestbook for select using (true);
+drop policy if exists "sign guestbook" on public.guestbook;
+create policy "sign guestbook" on public.guestbook for insert to authenticated with check (author_id = auth.uid());
+-- The writer, the profile's owner and admins can remove a note.
+drop policy if exists "remove guestbook note" on public.guestbook;
+create policy "remove guestbook note" on public.guestbook for delete to authenticated
+  using (author_id = auth.uid() or profile_id = auth.uid() or public.is_admin());
+revoke update on public.guestbook from anon, authenticated;
+
+-- ---------- text posts ----------
+-- A post can be words instead of a picture. It lives in the same table so it
+-- can be hearted, collected and reported like anything else.
+alter table public.images add column if not exists kind text not null default 'image'
+  check (kind in ('image', 'text'));
+alter table public.images add column if not exists body text
+  check (body is null or char_length(btrim(body)) between 1 and 280);
+alter table public.images add column if not exists style text
+  check (style is null or style in ('ink', 'paper', 'blush', 'night'));
+alter table public.images alter column url drop not null;
+alter table public.images drop constraint if exists images_content_check;
+alter table public.images add constraint images_content_check check (
+  (kind = 'image' and url is not null and body is null)
+  or (kind = 'text' and body is not null and url is null and provider = 'upload')
+);
+
+-- A report on a text post has no picture address; it carries the words instead.
+alter table public.reports alter column url drop not null;
+alter table public.reports add column if not exists excerpt text check (excerpt is null or char_length(excerpt) <= 300);

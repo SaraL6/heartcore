@@ -107,6 +107,42 @@ export async function setInCollection(collectionId: string, img: Img, on: boolea
 }
 
 export async function updateBio(id: string, bio: string) { ok(await db().from('profiles').update({ bio }).eq('id', id)) }
+export async function updateProfile(id: string, patch: Partial<Pick<Profile, 'bio' | 'mood' | 'accent' | 'cover_url'>>) {
+  ok(await db().from('profiles').update(patch).eq('id', id))
+}
+
+// ---------- profile extras ----------
+
+export type Friend = { id: string; username: string; cover_url: string | null }
+export async function topFriends(profileId: string): Promise<Friend[]> {
+  const rows = ok(await db().from('top_friends')
+    .select('position, friend:profiles!top_friends_friend_id_fkey(id, username, cover_url)')
+    .eq('user_id', profileId).order('position')) as any[]
+  return rows.map((r) => r.friend).filter(Boolean)
+}
+
+export type Entry = { id: string; body: string; created_at: string; author: { id: string; username: string } }
+export async function guestbook(profileId: string): Promise<Entry[]> {
+  const rows = ok(await db().from('guestbook')
+    .select('id, body, created_at, author:profiles!guestbook_author_id_fkey(id, username)')
+    .eq('profile_id', profileId).order('created_at', { ascending: false }).limit(60)) as any[]
+  return rows.filter((r) => r.author)
+}
+export async function signGuestbook(profileId: string, authorId: string, body: string) {
+  ok(await db().from('guestbook').insert({ profile_id: profileId, author_id: authorId, body }))
+}
+export async function deleteEntry(id: string) { ok(await db().from('guestbook').delete().eq('id', id)) }
+
+export async function bumpViews(profileId: string): Promise<number | null> {
+  return ok(await db().rpc('bump_profile_views', { p_profile: profileId })) as number | null
+}
+
+/** Usernames of the latest people to heart an image. */
+export async function notes(imageId: string): Promise<string[]> {
+  const rows = ok(await db().from('hearts').select('who:profiles(username)')
+    .eq('image_id', imageId).order('created_at', { ascending: false }).limit(6)) as any[]
+  return rows.map((r) => r.who?.username).filter(Boolean)
+}
 export async function setCover(id: string, url: string | null) { ok(await db().from('profiles').update({ cover_url: url }).eq('id', id)) }
 
 // ---------- take your things with you ----------
@@ -123,16 +159,16 @@ export async function exportEverything(me: Profile): Promise<Blob> {
     if (page.length < 500) break
   }
   const [posts, collections] = await Promise.all([profilePosts(me.id), profileCollections(me.id)])
-  const slim = (i: Img) => ({ url: i.url, caption: i.caption, tags: i.tags, credit: i.credit, source: i.sourceUrl, license: i.license })
+  const slim = (i: Img) => ({ url: i.url || undefined, words: i.body, caption: i.caption, tags: i.tags, credit: i.credit, source: i.sourceUrl, license: i.license })
   const data = {
     exported_at: new Date().toISOString(), username: me.username, bio: me.bio,
     hearts: hearts.map(slim), posts: posts.map(slim),
     collections: collections.map((c) => ({ name: c.name, images: c.images.map(slim) })),
   }
-  const grid = (imgs: Img[]) => `<div class="g">${imgs.map((i) => `<figure><a href="${safeUrl(i.sourceUrl ?? i.url)}"><img loading="lazy" src="${safeUrl(i.url)}" alt="${esc(i.caption)}"></a>${i.credit ? `<figcaption>by ${esc(i.credit)}${i.license ? ' · ' + esc(i.license) : ''}</figcaption>` : ''}</figure>`).join('')}</div>`
+  const grid = (imgs: Img[]) => `<div class="g">${imgs.map((i) => i.kind === 'text' ? `<figure><blockquote>${esc(i.body ?? '')}</blockquote></figure>` : `<figure><a href="${safeUrl(i.sourceUrl ?? i.url)}"><img loading="lazy" src="${safeUrl(i.url)}" alt="${esc(i.caption)}"></a>${i.credit ? `<figcaption>by ${esc(i.credit)}${i.license ? ' · ' + esc(i.license) : ''}</figcaption>` : ''}</figure>`).join('')}</div>`
   const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(me.username)} ♥ heartcore</title>
-<style>body{margin:0;padding:24px;background:#fdf6f4;color:#3a3238;font:15px/1.5 Helvetica,Arial,sans-serif}h1,h2{font:italic 28px Georgia,serif}h2{font-size:22px;margin-top:40px}.g{columns:5 200px;column-gap:12px}figure{break-inside:avoid;margin:0 0 12px;background:#fff;border:1px solid #f0dfe2}img{display:block;width:100%}figcaption{padding:6px 8px;font-size:12px;color:#9a8c94}</style>
+<style>body{margin:0;padding:24px;background:#fdf6f4;color:#3a3238;font:15px/1.5 Helvetica,Arial,sans-serif}h1,h2{font:italic 28px Georgia,serif}h2{font-size:22px;margin-top:40px}.g{columns:5 200px;column-gap:12px}figure{break-inside:avoid;margin:0 0 12px;background:#fff;border:1px solid #f0dfe2}img{display:block;width:100%}figcaption{padding:6px 8px;font-size:12px;color:#9a8c94}blockquote{margin:0;padding:28px 16px;font:italic 18px Georgia,serif;text-align:center;white-space:pre-wrap}</style>
 <h1>${esc(me.username)} ♥</h1><p>${esc(me.bio)}</p><p>Saved from heartcore on ${new Date().toDateString()}. The same list is inside this file as data, for importing elsewhere.</p>
 <h2>hearts (${hearts.length})</h2>${grid(hearts)}
 ${posts.length ? `<h2>posts (${posts.length})</h2>${grid(posts)}` : ''}
@@ -158,6 +194,16 @@ export async function createPost(userId: string, input: {
     caption: input.caption, tags: input.tags, uploader_id: userId, provider: 'upload',
   }).select('id').single()) as any
   // Posting something counts as hearting it, so it shows up for your followers.
+  await db().from('hearts').insert({ user_id: userId, image_id: row.id })
+  return row.id as string
+}
+
+export const TEXT_STYLES = ['ink', 'paper', 'blush', 'night'] as const
+
+export async function createTextPost(userId: string, input: { body: string; style: string; tags: string[] }) {
+  const row = ok(await db().from('images').insert({
+    kind: 'text', body: input.body, style: input.style, tags: input.tags, uploader_id: userId, provider: 'upload',
+  }).select('id').single()) as any
   await db().from('hearts').insert({ user_id: userId, image_id: row.id })
   return row.id as string
 }
@@ -198,21 +244,21 @@ export const REASONS: [string, string][] = [
 
 export async function fileReport(img: Img, reason: string, details: string, contact: string, reporterId?: string) {
   ok(await db().from('reports').insert({
-    image_id: img.id ?? null, provider: img.provider, provider_id: img.providerId ?? null, url: img.url,
+    image_id: img.id ?? null, provider: img.provider, provider_id: img.providerId ?? null, url: img.url || null, excerpt: img.body ?? null,
     reason, details, contact: contact || null, reporter_id: reporterId ?? null,
   }))
 }
 
-export type Report = { id: string; url: string; reason: string; details: string; contact: string | null; created_at: string; provider: string | null }
+export type Report = { id: string; url: string | null; excerpt: string | null; reason: string; details: string; contact: string | null; created_at: string; provider: string | null }
 export async function openReports(): Promise<Report[]> {
-  return ok(await db().from('reports').select('id, url, reason, details, contact, created_at, provider')
+  return ok(await db().from('reports').select('id, url, excerpt, reason, details, contact, created_at, provider')
     .eq('status', 'open').order('created_at').limit(100)) as Report[]
 }
 export async function resolveReport(r: Report, remove: boolean) {
   ok(await db().rpc('admin_resolve_report', { p_report: r.id, p_remove: remove }))
   const marker = `/object/public/${BUCKET}/`
-  const at = r.url.indexOf(marker)
-  if (remove && at >= 0) await db().storage.from(BUCKET).remove([decodeURIComponent(r.url.slice(at + marker.length))])
+  const at = r.url?.indexOf(marker) ?? -1
+  if (remove && r.url && at >= 0) await db().storage.from(BUCKET).remove([decodeURIComponent(r.url.slice(at + marker.length))])
 }
 
 export async function deleteAccount(userId: string) {

@@ -3,6 +3,7 @@ import * as api from './api'
 import { AuthModal, FollowButton, Grid, HeartIcon, Media, PostModal, UploadModal, useLoad } from './components'
 import { LEGAL_LINKS, LegalPage } from './legal'
 import { MUSIC_REF, MusicPlayer } from './music'
+import { AboutBox, Guestbook, TopButton, TopFriends, useAccent } from './profile'
 import { LIBRARY, searchImages } from './images'
 import { actions, initAuth, requireMe, supabase, toast, useStore, type Collection, type Img, type Profile, type Theme } from './store'
 
@@ -264,12 +265,16 @@ function ProfilePage({ username, tab, onOpen }: { username: string; tab: string;
   useEffect(() => { actions.setVisitTheme(theirTheme); return () => actions.setVisitTheme(null) }, [theirTheme])
   const [exporting, setExporting] = useState(false)
   const mine = !!p && me?.id === p.id
+  const [patch, setPatch] = useState<Partial<Profile>>({})
+  useEffect(() => { setPatch({}) }, [p?.id])
+  useAccent('accent' in patch ? patch.accent : p?.accent)
   const [bio, setBio] = useState('')
   useEffect(() => { if (p) setBio(p.bio) }, [p?.id])
 
   if (!supabase) return <NeedAccounts what="" />
   if (!head.data) return head.loading || head.error ? <Status loading={head.loading} error={head.error} /> : <p className="empty">there's nobody called “{username}” here.</p>
-  const { profile, followers, following: followingCount } = head.data
+  const { followers, following: followingCount } = head.data
+  const profile = { ...head.data.profile, ...patch }
 
   const saveBio = async () => {
     if (bio === profile.bio) return
@@ -314,10 +319,15 @@ function ProfilePage({ username, tab, onOpen }: { username: string; tab: string;
             {profile.cover_url && <button className="danger" onClick={async () => { try { await api.setCover(profile.id, null); actions.setMe({ ...me!, cover_url: null }); actions.refresh() } catch (e) { console.error(e); toast('could not remove your cover') } }}>remove cover</button>}
             <button className="danger" onClick={eraseAccount}>delete my account</button>
           </p>
-        ) : <FollowButton profileId={profile.id} />}
+        ) : <p className="account-links"><FollowButton profileId={profile.id} /><TopButton profileId={profile.id} /></p>}
       </header>
-      <Tabs base={`#/u/${profile.username}`} tabs={[['', 'hearts'], ['posts', 'posts'], ['collections', 'collections']]} current={tab} />
-      {tab === 'collections' ? <CollectionList key={rev} profile={profile} mine={mine} />
+      <div className="panels">
+        <AboutBox key={profile.id} profile={profile} mine={mine} onChange={(change) => setPatch((old) => ({ ...old, ...change }))} />
+        <TopFriends profile={profile} mine={mine} />
+      </div>
+      <Tabs base={`#/u/${profile.username}`} tabs={[['', 'hearts'], ['posts', 'posts'], ['collections', 'collections'], ['guestbook', 'guestbook']]} current={tab} />
+      {tab === 'guestbook' ? <Guestbook profile={profile} mine={mine} />
+        : tab === 'collections' ? <CollectionList key={rev} profile={profile} mine={mine} />
         : tab === 'posts' ? <Feed key={`p${rev}`} load={() => api.profilePosts(profile.id)} onOpen={onOpen} empty={mine ? 'you haven’t posted anything yet. hit “+ post”.' : 'no posts yet.'} />
         : <Feed key={`h${rev}`} load={() => api.profileHearts(profile.id)} onOpen={onOpen} empty={mine ? 'nothing hearted yet — go fall in love with something ♡' : 'no hearts yet.'} />}
     </>
@@ -409,7 +419,9 @@ function AdminPage() {
         <ul className="reports">
           {data.map((r) => (
             <li key={r.id}>
-              <a href={r.url} target="_blank" rel="noreferrer noopener"><img src={r.url} alt="reported" loading="lazy" /></a>
+              {r.url
+                ? <a href={r.url} target="_blank" rel="noreferrer noopener"><img src={r.url} alt="reported" loading="lazy" /></a>
+                : <blockquote>{r.excerpt}</blockquote>}
               <div>
                 <strong>{label(r.reason)}</strong>
                 {r.details && <p>{r.details}</p>}

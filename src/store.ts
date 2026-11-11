@@ -11,6 +11,9 @@ export type Img = {
   id?: string
   key: string
   provider: string // 'upload' or the name of an image API
+  kind?: 'text' // a post made of words; `body` and `style` are set and `url` is empty
+  body?: string
+  style?: string
   providerId?: string
   url: string
   thumb?: string
@@ -26,8 +29,10 @@ export type Img = {
   heartCount: number
   via?: string // "hearted by" username, in the friends feed
 }
-export type Profile = { id: string; username: string; bio: string; cover_url?: string | null; theme?: Theme; music?: string | null }
-export const PROFILE_COLS = 'id, username, bio, cover_url, theme, music'
+export type Profile = { id: string; username: string; bio: string; cover_url?: string | null; theme?: Theme; music?: string | null
+  mood?: string | null; accent?: string | null; views?: number
+}
+export const PROFILE_COLS = 'id, username, bio, cover_url, theme, music, mood, accent, views'
 export type Collection = { id: string; name: string; userId: string; images: Img[] }
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -41,6 +46,7 @@ type State = {
   hearted: Record<string, string> // image key -> image id
   counts: Record<string, number> // heart counts changed this session
   following: string[] // profile ids
+  top: Record<string, number> // my top 8: profile id -> position
   theme: Theme
   visitTheme: Theme | null // while looking at someone's profile, you see it their way
   quiet: boolean // hide heart counts
@@ -55,7 +61,7 @@ const savedQuiet = (() => { try { return localStorage.getItem('heartcore:quiet')
 const savedMusic = (() => { try { return localStorage.getItem('heartcore:music') } catch { return null } })()
 const savedTheme = (() => { try { return localStorage.getItem('heartcore:theme') as Theme | null } catch { return null } })()
 let state: State = {
-  ready: !supabase, me: null, isAdmin: false, hearted: {}, counts: {}, following: [],
+  ready: !supabase, me: null, isAdmin: false, hearted: {}, counts: {}, following: [], top: {},
   theme: savedTheme ?? 'pastel', visitTheme: null, quiet: savedQuiet, music: savedMusic, musicOpen: false, authOpen: false, toast: '', rev: 0,
 }
 const listeners = new Set<() => void>()
@@ -76,7 +82,8 @@ export function toImg(r: any, via?: string): Img {
     id: r.id,
     key: r.provider === 'upload' ? r.id : `${r.provider}:${r.provider_id}`,
     provider: r.provider, providerId: r.provider_id ?? undefined,
-    url: r.url, thumb: r.thumb ?? undefined, width: r.width ?? undefined, height: r.height ?? undefined,
+    kind: r.kind === 'text' ? 'text' : undefined, body: r.body ?? undefined, style: r.style ?? undefined,
+    url: r.url ?? '', thumb: r.thumb ?? undefined, width: r.width ?? undefined, height: r.height ?? undefined,
     caption: r.caption ?? '', tags: r.tags ?? [], credit: r.credit ?? undefined,
     sourceUrl: r.source_url ?? undefined, license: r.license ?? undefined,
     uploader: r.uploader ?? undefined, heartCount: r.heart_count ?? 0, via,
@@ -85,11 +92,12 @@ export function toImg(r: any, via?: string): Img {
 
 async function loadMe(userId: string) {
   if (!supabase) return
-  const [profile, hearts, follows, admin] = await Promise.all([
+  const [profile, hearts, follows, admin, tops] = await Promise.all([
     supabase.from('profiles').select(PROFILE_COLS).eq('id', userId).maybeSingle(),
     supabase.from('hearts').select('image_id, images(provider, provider_id)').eq('user_id', userId),
     supabase.from('follows').select('following_id').eq('follower_id', userId),
     supabase.rpc('is_admin'),
+    supabase.from('top_friends').select('friend_id, position').eq('user_id', userId),
   ])
   if (profile.error || !profile.data) {
     toast('could not load your profile — has the database schema been run?')
@@ -100,7 +108,8 @@ async function loadMe(userId: string) {
     const i = h.images
     if (i) hearted[i.provider === 'upload' ? h.image_id : `${i.provider}:${i.provider_id}`] = h.image_id
   }
-  set({ theme: (profile.data.theme as Theme) ?? state.theme, ready: true, me: profile.data as Profile, isAdmin: admin.data === true, hearted, following: (follows.data ?? []).map((f: any) => f.following_id) })
+  set({ theme: (profile.data.theme as Theme) ?? state.theme, ready: true, me: profile.data as Profile, isAdmin: admin.data === true, hearted, following: (follows.data ?? []).map((f: any) => f.following_id),
+    top: Object.fromEntries((tops.data ?? []).map((t: any) => [t.friend_id, t.position])) })
 }
 
 export function initAuth() {
@@ -110,7 +119,7 @@ export function initAuth() {
     if (userId === current) return
     current = userId
     if (userId) loadMe(userId)
-    else set({ ready: true, me: null, isAdmin: false, hearted: {}, following: [] })
+    else set({ ready: true, me: null, isAdmin: false, hearted: {}, following: [], top: {} })
   }
   supabase.auth.getSession().then(({ data }) => apply(data.session?.user.id ?? null))
   // Defer: Supabase calls made directly inside this callback can deadlock.
@@ -206,6 +215,24 @@ export const actions = {
       : supabase.from('follows').insert({ follower_id: me.id, following_id: profileId })
     const { error } = await q
     if (error && error.code !== '23505') { set({ following: before }); toast('could not update follow — try again') }
+  },
+  async toggleTop(profileId: string) {
+    const me = requireMe()
+    if (!me || !supabase) return
+    const before = state.top
+    if (profileId in before) {
+      const { [profileId]: _gone, ...rest } = before
+      set({ top: rest })
+      const { error } = await supabase.from('top_friends').delete().eq('user_id', me.id).eq('friend_id', profileId)
+      if (error) { set({ top: before }); toast('could not update your top 8') }
+      return
+    }
+    const taken = new Set(Object.values(before))
+    const position = [1, 2, 3, 4, 5, 6, 7, 8].find((n) => !taken.has(n))
+    if (!position) return toast('your top 8 is full — remove someone first')
+    set({ top: { ...before, [profileId]: position } })
+    const { error } = await supabase.from('top_friends').insert({ user_id: me.id, friend_id: profileId, position })
+    if (error && error.code !== '23505') { set({ top: before }); toast('could not update your top 8') }
   },
   async signOut() { await supabase?.auth.signOut() },
 }

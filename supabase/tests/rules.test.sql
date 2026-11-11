@@ -30,6 +30,11 @@ select t_refused($$insert into images (url, uploader_id, heart_count) values ('h
 select t_refused($$insert into images (url, uploader_id) values ('javascript:alert(1)', auth.uid())$$, 'posting a non-web address');
 select t_refused($$update images set heart_count = 500$$, 'editing heart counts');
 select t_refused($$update images set removed = false$$, 'un-removing images');
+select t_rows($$insert into images (kind, body, style, uploader_id) values ('text', 'stay weird', 'ink', auth.uid())$$, 1, 'posting words');
+select t_refused($$insert into images (kind, body, uploader_id) values ('text', '   ', auth.uid())$$, 'an empty text post');
+select t_refused($$insert into images (kind, body, url, uploader_id) values ('text', 'hi', 'https://x/y.jpg', auth.uid())$$, 'a text post that also carries a picture');
+select t_refused($$insert into images (kind, uploader_id) values ('image', auth.uid())$$, 'an image post with no picture');
+select t_refused($$insert into images (kind, body, style, uploader_id) values ('text', 'hi', 'comic-sans', auth.uid())$$, 'an unknown card style');
 insert into collections (user_id, name) values (auth.uid(), 'faves') returning id as coll \gset
 insert into collection_images values (:'coll', :'ext');
 insert into follows (follower_id, following_id) values (auth.uid(), :'mia');
@@ -42,8 +47,27 @@ select t_refused($$update profiles set id = gen_random_uuid() where id = auth.ui
 select t_refused($$insert into admins values (auth.uid())$$, 'making yourself an admin');
 select t_is($$select is_admin()::text$$, 'false', 'members are not admins');
 
+select t_refused($$update profiles set views = 99999 where id = auth.uid()$$, 'setting your own visit count');
+select t_refused($$update profiles set accent = 'red; background:url(x)' where id = auth.uid()$$, 'a profile colour that is not a plain hex colour');
+select t_rows($$update profiles set accent = '#ff5c8a', mood = 'dreamy' where id = auth.uid()$$, 1, 'setting your mood and colour');
+select t_is(format($$select coalesce(bump_profile_views(%L), -1)::text$$, :'lena'), '-1', 'your own visits are not counted');
+select t_is(format($$select bump_profile_views(%L)::text$$, :'mia'), '1', 'visiting someone counts once per call');
+insert into top_friends (user_id, friend_id, position) values (auth.uid(), :'mia', 1);
+select t_refused(format($$insert into top_friends (user_id, friend_id, position) values (auth.uid(), %L, 1)$$, '00000000-0000-0000-0000-00000000000c'), 'two friends in the same top-8 slot');
+select t_refused(format($$insert into top_friends (user_id, friend_id, position) values (auth.uid(), %L, 9)$$, '00000000-0000-0000-0000-00000000000c'), 'a ninth top-8 slot');
+select t_refused($$insert into top_friends (user_id, friend_id, position) values (auth.uid(), auth.uid(), 2)$$, 'putting yourself in your top 8');
+select t_refused(format($$insert into top_friends (user_id, friend_id, position) values (%L, auth.uid(), 1)$$, :'mia'), 'editing someone else''s top 8');
+insert into guestbook (profile_id, author_id, body) values (:'mia', auth.uid(), 'hi mia!');
+insert into guestbook (profile_id, author_id, body) values (:'lena', auth.uid(), 'note to self');
+select t_refused(format($$insert into guestbook (profile_id, author_id, body) values (auth.uid(), %L, 'forged')$$, :'mia'), 'signing a guestbook as someone else');
+select t_refused($$insert into guestbook (profile_id, author_id, body) values (auth.uid(), auth.uid(), '   ')$$, 'an empty guestbook note');
+
 -- ===== signed in as mia =====
 set request.jwt.claim.sub = :'mia';
+select t_rows($$delete from top_friends$$, 0, 'cannot edit other people''s top 8');
+select t_refused($$update guestbook set body = 'edited'$$, 'editing guestbook notes');
+select t_rows(format($$delete from guestbook where profile_id = %L$$, :'lena'), 0, 'cannot remove notes on someone else''s profile');
+select t_rows(format($$delete from guestbook where profile_id = %L$$, :'mia'), 1, 'can remove notes left on your own profile');
 select t_refused(format($$insert into collection_images values (%L, %L)$$, :'coll', :'ext'), 'adding to someone else''s collection');
 select t_rows($$delete from hearts$$, 0, 'cannot remove other people''s hearts');
 select t_rows($$delete from images$$, 0, 'cannot delete other people''s posts');
@@ -59,7 +83,7 @@ select t_refused($$select admin_resolve_report((select gen_random_uuid()), true)
 
 -- ===== not signed in =====
 reset role; set role anon; set request.jwt.claim.sub = '';
-select t_is($$select count(*)::text from images$$, '2', 'anyone can browse');
+select t_is($$select count(*)::text from images$$, '3', 'anyone can browse');
 select t_refused($$select save_external_image('openverse', 'zzz', 'https://x/y.jpg', null, 1, 1, '', '{}', '', '', '')$$, 'saving images while signed out');
 select t_refused(format($$insert into hearts values (%L, %L)$$, :'lena', :'ext'), 'hearting while signed out');
 insert into reports (provider, provider_id, url, reason, contact) values ('openverse', 'abc', 'https://x/y.jpg', 'copyright', 'owner@example.com');
@@ -75,7 +99,7 @@ set role authenticated; set request.jwt.claim.sub = :'lena';
 select t_is($$select count(*)::text from reports where status = 'open'$$, '2', 'admins can read reports');
 select admin_resolve_report(:'rep', true);
 select t_is($$select count(*)::text from reports where status = 'open'$$, '0', 'a takedown closes every report on that picture');
-select t_is($$select count(*)::text from images$$, '1', 'a removed picture is hidden from everyone');
+select t_is($$select count(*)::text from images$$, '2', 'a removed picture is hidden from everyone');
 select t_is($$select bool_and(removed)::text from external_status('openverse', '{abc}')$$, 'true', 'the library lookup reports it as removed');
 select t_is(format($$select coalesce(cover_url, 'none') from profiles where id = %L$$, :'mia'), 'none', 'a takedown clears it from profile covers');
 
