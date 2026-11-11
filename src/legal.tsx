@@ -14,6 +14,7 @@ const PAGES: Record<string, { title: string; body: React.ReactNode }> = {
         <p>heartcore is for collecting pretty, cozy, inspiring things. To keep it that way:</p>
         <ul>
           <li><b>Only post what you may share.</b> Your own photos and art, or things you have permission to post. Credit the creator when you know who it is.</li>
+          <li><b>Made by humans.</b> No AI-generated images. This is a place for real photos, real art and real moments.</li>
           <li><b>No nudity or sexual content.</b> None at all involving anyone under 18 — that is reported to the authorities and the account is banned.</li>
           <li><b>No harassment or hate,</b> and no photos of private people posted to mock, expose or target them.</li>
           <li><b>No graphic violence</b> and nothing that promotes self-harm or eating disorders.</li>

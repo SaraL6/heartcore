@@ -15,7 +15,13 @@ show up in the order they happened, and that's it.
 - **Post** — upload a jpg/png/gif or paste an image link, with caption and tags
 - **Friends** — follow people, see what they heart, browse what everyone is hearting
 - **Profiles** — hearts, posts, collections, bio, follower counts
-- **Themes** — pastel, soft grunge and galaxy
+- **Your canvas** — pick any image as your profile cover, and your theme is
+  what visitors see when they open your page
+- **Themes** — pastel, soft grunge, galaxy, vintage and daydream
+- **Take it with you** — "download everything" saves all your hearts, posts
+  and collections as one web page, so they can never vanish
+- **Human-made only** — no AI-generated images, and a report reason for them
+- **No numbers if you like** — hide heart counts everywhere with one click
 - **Safety** — report button, moderation queue, takedowns, account deletion
 
 Without a Supabase project the site still works as a browse-only gallery.

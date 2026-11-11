@@ -43,7 +43,7 @@ export function Media({ img, onDead }: { img: Img; onDead?: () => void }) {
 export function HeartButton({ img, big }: { img: Img; big?: boolean }) {
   const s = useStore()
   const on = !!s.hearted[img.key]
-  const n = heartCount(s, img)
+  const n = s.quiet ? 0 : heartCount(s, img)
   return (
     <button
       className={`heart-btn${on ? ' on' : ''}${big ? ' big' : ''}`}
@@ -51,7 +51,7 @@ export function HeartButton({ img, big }: { img: Img; big?: boolean }) {
       onClick={(e) => { e.stopPropagation(); actions.toggleHeart(img) }}
     >
       <HeartIcon filled={on} />
-      {(n > 0 || big) && <span>{fmt(n)}</span>}
+      {s.quiet ? big && <span>{on ? 'hearted' : 'heart'}</span> : (n > 0 || big) && <span>{fmt(n)}</span>}
     </button>
   )
 }
@@ -243,6 +243,11 @@ export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
           )}
           <HeartButton img={img} big />
           <SaveToCollection img={img} />
+          {me && (
+            <button className="danger cover-link" onClick={async () => {
+              try { await api.setCover(me.id, img.url); actions.setMe({ ...me, cover_url: img.url }); actions.refresh(); toast('this is now your profile cover ♥') } catch (e) { console.error(e); toast('could not set your cover') }
+            }}>use as my profile cover</button>
+          )}
           {mine && <button className="danger" onClick={remove}>delete post</button>}
           {reporting
             ? <ReportForm img={img} onDone={() => setReporting(false)} />
@@ -345,7 +350,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         <label>tags
           <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="grunge, pastel, summer" />
         </label>
-        <p className="muted small">Only post things you made or have permission to share, and nothing that breaks the <a className="underline" href="#/about/rules" target="_blank" rel="noreferrer">rules</a>.</p>
+        <p className="muted small">Only post things you made or have permission to share — no AI-generated images — and nothing that breaks the <a className="underline" href="#/about/rules" target="_blank" rel="noreferrer">rules</a>.</p>
         {error && <p className="error" role="alert">{error}</p>}
         <button className="primary" type="submit" disabled={busy}>{busy ? 'posting…' : 'post it ♥'}</button>
       </form>

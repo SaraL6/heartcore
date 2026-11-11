@@ -295,3 +295,27 @@ grant execute on function public.delete_my_account to authenticated;
 drop policy if exists "admins delete uploads" on storage.objects;
 create policy "admins delete uploads" on storage.objects for delete to authenticated
   using (bucket_id = 'images' and public.is_admin());
+
+-- ---------- profile canvas: cover picture and personal theme ----------
+
+alter table public.profiles add column if not exists cover_url text
+  check (cover_url is null or (cover_url ~ '^https?://' and char_length(cover_url) <= 1000));
+alter table public.profiles add column if not exists theme text not null default 'pastel'
+  check (theme in ('pastel', 'grunge', 'galaxy', 'vintage', 'dream'));
+grant update (username, bio, cover_url, theme) on public.profiles to authenticated;
+
+-- "It's AI-generated" is a report reason (the rules ask for human-made pictures only).
+alter table public.reports drop constraint if exists reports_reason_check;
+alter table public.reports add constraint reports_reason_check
+  check (reason in ('copyright', 'nudity', 'minor', 'harassment', 'violence', 'spam', 'ai', 'other'));
+
+-- Taking a picture down also clears it from anyone's profile cover.
+create or replace function public.clear_removed_covers() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  update public.profiles set cover_url = null where cover_url = new.url;
+  return null;
+end $$;
+drop trigger if exists images_removed_covers on public.images;
+create trigger images_removed_covers after insert or update of removed on public.images
+  for each row when (new.removed) execute function public.clear_removed_covers();

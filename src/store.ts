@@ -1,7 +1,7 @@
 import { useSyncExternalStore } from 'react'
 import { createClient } from '@supabase/supabase-js'
 
-export type Theme = 'pastel' | 'grunge' | 'galaxy'
+export type Theme = 'pastel' | 'grunge' | 'galaxy' | 'vintage' | 'dream'
 
 // One picture, wherever it came from. `id` is set once it exists in our
 // database; `key` identifies it either way (so we know what you've hearted
@@ -24,7 +24,8 @@ export type Img = {
   heartCount: number
   via?: string // "hearted by" username, in the friends feed
 }
-export type Profile = { id: string; username: string; bio: string }
+export type Profile = { id: string; username: string; bio: string; cover_url?: string | null; theme?: Theme }
+export const PROFILE_COLS = 'id, username, bio, cover_url, theme'
 export type Collection = { id: string; name: string; userId: string; images: Img[] }
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -39,15 +40,18 @@ type State = {
   counts: Record<string, number> // heart counts changed this session
   following: string[] // profile ids
   theme: Theme
+  visitTheme: Theme | null // while looking at someone's profile, you see it their way
+  quiet: boolean // hide heart counts
   authOpen: boolean
   toast: string
   rev: number // bumped when lists should reload (after posting or deleting)
 }
 
+const savedQuiet = (() => { try { return localStorage.getItem('heartcore:quiet') === '1' } catch { return false } })()
 const savedTheme = (() => { try { return localStorage.getItem('heartcore:theme') as Theme | null } catch { return null } })()
 let state: State = {
   ready: !supabase, me: null, isAdmin: false, hearted: {}, counts: {}, following: [],
-  theme: savedTheme ?? 'pastel', authOpen: false, toast: '', rev: 0,
+  theme: savedTheme ?? 'pastel', visitTheme: null, quiet: savedQuiet, authOpen: false, toast: '', rev: 0,
 }
 const listeners = new Set<() => void>()
 const set = (patch: Partial<State>) => { state = { ...state, ...patch }; listeners.forEach((l) => l()) }
@@ -78,7 +82,7 @@ export function toImg(r: any, via?: string): Img {
 async function loadMe(userId: string) {
   if (!supabase) return
   const [profile, hearts, follows, admin] = await Promise.all([
-    supabase.from('profiles').select('id, username, bio').eq('id', userId).maybeSingle(),
+    supabase.from('profiles').select(PROFILE_COLS).eq('id', userId).maybeSingle(),
     supabase.from('hearts').select('image_id, images(provider, provider_id)').eq('user_id', userId),
     supabase.from('follows').select('following_id').eq('follower_id', userId),
     supabase.rpc('is_admin'),
@@ -92,7 +96,7 @@ async function loadMe(userId: string) {
     const i = h.images
     if (i) hearted[i.provider === 'upload' ? h.image_id : `${i.provider}:${i.provider_id}`] = h.image_id
   }
-  set({ ready: true, me: profile.data, isAdmin: admin.data === true, hearted, following: (follows.data ?? []).map((f: any) => f.following_id) })
+  set({ theme: (profile.data.theme as Theme) ?? state.theme, ready: true, me: profile.data as Profile, isAdmin: admin.data === true, hearted, following: (follows.data ?? []).map((f: any) => f.following_id) })
 }
 
 export function initAuth() {
@@ -133,7 +137,17 @@ export const heartCount = (s: State, img: Img) => s.counts[img.key] ?? img.heart
 export const actions = {
   setTheme(theme: Theme) {
     try { localStorage.setItem('heartcore:theme', theme) } catch { /* private mode */ }
-    set({ theme })
+    set({ theme, visitTheme: null })
+    // Your theme is part of your profile: visitors see your page dressed this way.
+    if (state.me && supabase) {
+      set({ me: { ...state.me, theme } })
+      supabase.from('profiles').update({ theme }).eq('id', state.me.id).then(({ error }) => error && console.error(error))
+    }
+  },
+  setVisitTheme: (visitTheme: Theme | null) => set({ visitTheme }),
+  toggleQuiet() {
+    try { localStorage.setItem('heartcore:quiet', state.quiet ? '0' : '1') } catch { /* private mode */ }
+    set({ quiet: !state.quiet })
   },
   openAuth: (open: boolean) => set({ authOpen: open }),
   refresh: () => set({ rev: state.rev + 1 }),

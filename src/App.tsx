@@ -20,6 +20,8 @@ const THEMES: { id: Theme; label: string }[] = [
   { id: 'pastel', label: 'pastel' },
   { id: 'grunge', label: 'soft grunge' },
   { id: 'galaxy', label: 'galaxy' },
+  { id: 'vintage', label: 'vintage' },
+  { id: 'dream', label: 'daydream' },
 ]
 const POPULAR = ['vintage', 'grunge', 'pastel', 'polaroid', 'flowers', 'ocean', 'sunset', 'paris', 'coffee', 'cats', 'fashion', 'film', 'stars', 'summer']
 type Open = (img: Img) => void
@@ -32,7 +34,8 @@ export default function App() {
   const [query, setQuery] = useState('')
 
   useEffect(() => { initAuth() }, [])
-  useEffect(() => { document.documentElement.dataset.theme = s.theme }, [s.theme])
+  const shownTheme = s.visitTheme ?? s.theme
+  useEffect(() => { document.documentElement.dataset.theme = shownTheme }, [shownTheme])
   useEffect(() => { setOpen(null) }, [route])
 
   const [, section, arg = '', sub = ''] = route.split('/')
@@ -67,7 +70,7 @@ export default function App() {
         <div className="themes" role="group" aria-label="Theme">
           {THEMES.map((t) => (
             <button key={t.id} className={`swatch ${t.id}`} title={t.label} aria-label={`${t.label} theme`}
-              aria-pressed={s.theme === t.id} onClick={() => actions.setTheme(t.id)} />
+              aria-pressed={shownTheme === t.id} onClick={() => actions.setTheme(t.id)} />
           ))}
         </div>
         <button className="primary" onClick={() => requireMe() && setUploading(true)}>+ post</button>
@@ -77,6 +80,7 @@ export default function App() {
         made with ♥ for the tumblr kids · no ads, no tracking, ever · photos from <a href="https://openverse.org" target="_blank" rel="noreferrer noopener">Openverse</a>, shared by their creators under Creative Commons licenses
         <nav>
           {LEGAL_LINKS.map(([path, label]) => <a key={path} href={`#/about/${path}`}>{label}</a>)}
+          <button className="link" aria-pressed={s.quiet} onClick={actions.toggleQuiet}>{s.quiet ? 'show heart counts' : 'hide heart counts'}</button>
           {s.isAdmin && <a href="#/admin">moderation</a>}
         </nav>
       </footer>
@@ -249,8 +253,12 @@ function PersonRow({ p }: { p: Profile }) {
 function ProfilePage({ username, tab, onOpen }: { username: string; tab: string; onOpen: Open }) {
   const { me, following, rev } = useStore()
   const iFollow = following.length
-  const head = useLoad(() => api.getProfile(username), [username, iFollow])
+  const head = useLoad(() => api.getProfile(username), [username, iFollow, rev])
   const p = head.data?.profile
+  // Dress the page in its owner's theme while you're visiting (your own choice wins on your own page).
+  const theirTheme = p && me?.id !== p.id ? p.theme ?? null : null
+  useEffect(() => { actions.setVisitTheme(theirTheme); return () => actions.setVisitTheme(null) }, [theirTheme])
+  const [exporting, setExporting] = useState(false)
   const mine = !!p && me?.id === p.id
   const [bio, setBio] = useState('')
   useEffect(() => { if (p) setBio(p.bio) }, [p?.id]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -264,6 +272,17 @@ function ProfilePage({ username, tab, onOpen }: { username: string; tab: string;
     try { await api.updateBio(profile.id, bio); profile.bio = bio; actions.setMe({ ...me!, bio }) } catch (e) { console.error(e); toast('could not save your bio') }
   }
 
+  const download = async () => {
+    setExporting(true)
+    try {
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(await api.exportEverything(profile))
+      a.download = `heartcore-${profile.username}.html`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(a.href), 10_000)
+    } catch (e) { console.error(e); toast('could not build your download — try again') }
+    setExporting(false)
+  }
   const eraseAccount = async () => {
     if (prompt('This permanently erases your profile, posts, hearts, collections and follows.\nType your username to confirm:') !== profile.username) return
     try { await api.deleteAccount(profile.id); location.hash = '#/'; toast('your account has been deleted') } catch (e) { console.error(e); toast('could not delete your account — try again') }
@@ -271,7 +290,8 @@ function ProfilePage({ username, tab, onOpen }: { username: string; tab: string;
 
   return (
     <>
-      <header className="profile">
+      <header className={`profile${profile.cover_url ? ' has-cover' : ''}`}>
+        {profile.cover_url && <div className="cover" style={{ backgroundImage: `url("${encodeURI(profile.cover_url)}")` }} />}
         <span className="avatar xl">{profile.username[0]}</span>
         <h1>{profile.username}</h1>
         {mine
@@ -279,9 +299,12 @@ function ProfilePage({ username, tab, onOpen }: { username: string; tab: string;
               onChange={(e) => setBio(e.target.value)} onBlur={saveBio} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
           : profile.bio && <p className="bio">{profile.bio}</p>}
         <p className="stats"><span><b>{followers}</b> followers</span><span><b>{followingCount}</b> following</span></p>
+        {mine && !profile.cover_url && <p className="muted small">tip: open any image and choose “use as my profile cover” · your theme is what visitors see</p>}
         {mine ? (
           <p className="account-links">
             <button className="danger" onClick={() => { actions.signOut(); location.hash = '#/' }}>sign out</button>
+            <button className="danger" onClick={download} disabled={exporting}>{exporting ? 'packing…' : 'download everything'}</button>
+            {profile.cover_url && <button className="danger" onClick={async () => { try { await api.setCover(profile.id, null); actions.setMe({ ...me!, cover_url: null }); actions.refresh() } catch (e) { console.error(e); toast('could not remove your cover') } }}>remove cover</button>}
             <button className="danger" onClick={eraseAccount}>delete my account</button>
           </p>
         ) : <FollowButton profileId={profile.id} />}

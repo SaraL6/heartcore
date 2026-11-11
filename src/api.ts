@@ -1,4 +1,4 @@
-import { SELECT_IMG, ensureSaved, supabase, toImg, type Collection, type Img, type Profile } from './store'
+import { PROFILE_COLS, SELECT_IMG, ensureSaved, supabase, toImg, type Collection, type Img, type Profile } from './store'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 // All database reads and writes that aren't part of the signed-in session state.
@@ -44,7 +44,7 @@ export async function findPeople(search: string): Promise<Profile[]> {
 }
 
 export async function getProfile(username: string) {
-  const profile = ok(await db().from('profiles').select('id, username, bio').eq('username', username).maybeSingle()) as Profile | null
+  const profile = ok(await db().from('profiles').select(PROFILE_COLS).eq('username', username).maybeSingle()) as Profile | null
   if (!profile) return null
   const [followers, following] = await Promise.all([
     db().from('follows').select('*', { count: 'exact', head: true }).eq('following_id', profile.id),
@@ -53,9 +53,9 @@ export async function getProfile(username: string) {
   return { profile, followers: followers.count ?? 0, following: following.count ?? 0 }
 }
 
-export async function profileHearts(id: string): Promise<Img[]> {
+export async function profileHearts(id: string, from = 0, count = 150): Promise<Img[]> {
   const rows = ok(await db().from('hearts').select(`image:images(${SELECT_IMG})`)
-    .eq('user_id', id).order('created_at', { ascending: false }).limit(150)) as any[]
+    .eq('user_id', id).order('created_at', { ascending: false }).range(from, from + count - 1)) as any[]
   return rows.filter((r) => r.image).map((r) => toImg(r.image))
 }
 
@@ -108,6 +108,39 @@ export async function setInCollection(collectionId: string, img: Img, on: boolea
 }
 
 export async function updateBio(id: string, bio: string) { ok(await db().from('profiles').update({ bio }).eq('id', id)) }
+export async function setCover(id: string, url: string | null) { ok(await db().from('profiles').update({ cover_url: url }).eq('id', id)) }
+
+// ---------- take your things with you ----------
+
+const esc = (t: string) => t.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
+const safeUrl = (u?: string) => (u && /^https?:\/\//i.test(u) ? esc(u) : '#')
+
+/** Everything you've hearted, posted and collected, as one web page you can keep. */
+export async function exportEverything(me: Profile): Promise<Blob> {
+  const hearts: Img[] = []
+  for (let from = 0; ; from += 500) {
+    const page = await profileHearts(me.id, from, 500)
+    hearts.push(...page)
+    if (page.length < 500) break
+  }
+  const [posts, collections] = await Promise.all([profilePosts(me.id), profileCollections(me.id)])
+  const slim = (i: Img) => ({ url: i.url, caption: i.caption, tags: i.tags, credit: i.credit, source: i.sourceUrl, license: i.license })
+  const data = {
+    exported_at: new Date().toISOString(), username: me.username, bio: me.bio,
+    hearts: hearts.map(slim), posts: posts.map(slim),
+    collections: collections.map((c) => ({ name: c.name, images: c.images.map(slim) })),
+  }
+  const grid = (imgs: Img[]) => `<div class="g">${imgs.map((i) => `<figure><a href="${safeUrl(i.sourceUrl ?? i.url)}"><img loading="lazy" src="${safeUrl(i.url)}" alt="${esc(i.caption)}"></a>${i.credit ? `<figcaption>by ${esc(i.credit)}${i.license ? ' · ' + esc(i.license) : ''}</figcaption>` : ''}</figure>`).join('')}</div>`
+  const html = `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(me.username)} ♥ heartcore</title>
+<style>body{margin:0;padding:24px;background:#fdf6f4;color:#3a3238;font:15px/1.5 Helvetica,Arial,sans-serif}h1,h2{font:italic 28px Georgia,serif}h2{font-size:22px;margin-top:40px}.g{columns:5 200px;column-gap:12px}figure{break-inside:avoid;margin:0 0 12px;background:#fff;border:1px solid #f0dfe2}img{display:block;width:100%}figcaption{padding:6px 8px;font-size:12px;color:#9a8c94}</style>
+<h1>${esc(me.username)} ♥</h1><p>${esc(me.bio)}</p><p>Saved from heartcore on ${new Date().toDateString()}. The same list is inside this file as data, for importing elsewhere.</p>
+<h2>hearts (${hearts.length})</h2>${grid(hearts)}
+${posts.length ? `<h2>posts (${posts.length})</h2>${grid(posts)}` : ''}
+${collections.map((c) => `<h2>${esc(c.name)} (${c.images.length})</h2>${grid(c.images)}`).join('')}
+<script type="application/json" id="heartcore-data">${JSON.stringify(data).replace(/</g, '\\u003c')}</script></html>`
+  return new Blob([html], { type: 'text/html' })
+}
 
 const BUCKET = 'images'
 const EXT: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp' }
@@ -159,6 +192,7 @@ export const REASONS: [string, string][] = [
   ['minor', 'it sexualises or endangers a child'],
   ['harassment', 'harassment, hate or a private person'],
   ['violence', 'violence or self-harm'],
+  ['ai', "it's AI-generated"],
   ['spam', 'spam or scam'],
   ['other', 'something else'],
 ]

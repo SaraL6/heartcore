@@ -14,6 +14,20 @@
   --bg: #0d0822; --card: #1a1238; --ink: #ece6ff; --muted: #9a8fc4; --line: #2c2156;
   --accent: #c86bff; --accent-ink: #12092b; --chip: #241a4a;
 }
+[data-theme="vintage"] {
+  --bg: #f3ead9; --card: #fbf6ea; --ink: #4a3b2c; --muted: #9b8a73; --line: #e2d3b8;
+  --accent: #b5533c; --accent-ink: #fff8ec; --chip: #eadcc2;
+  --font: Georgia, "Times New Roman", serif; --radius: 2px;
+}
+[data-theme="vintage"] .card-media > img { filter: sepia(0.28) contrast(0.96) saturate(0.9); }
+[data-theme="dream"] {
+  --bg: #f1ecff; --card: #fffaff; --ink: #453a63; --muted: #9a8fc0; --line: #dfd4fa;
+  --accent: #9b6bff; --accent-ink: #fff; --chip: #e6dcff; --radius: 14px;
+}
+[data-theme="dream"] body {
+  background: radial-gradient(70vw 60vh at 0% 0%, #ffd9ec, transparent), radial-gradient(60vw 60vh at 100% 20%, #cfe9ff, transparent), var(--bg);
+  background-attachment: fixed;
+}
 [data-theme="galaxy"] body {
   background:
     radial-gradient(60vw 50vh at 10% 0%, #3b1d6e88, transparent),
@@ -53,6 +67,8 @@ input { background: var(--card); border: 1px solid var(--line); border-radius: v
 .swatch[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--accent); }
 .swatch.pastel { background: linear-gradient(135deg, #ffd6e0, #e2d4ff); }
 .swatch.grunge { background: linear-gradient(135deg, #2a282e, #6b6168); }
+.swatch.vintage { background: linear-gradient(135deg, #f3ead9, #b5533c); }
+.swatch.dream { background: linear-gradient(135deg, #ffd9ec, #cfe9ff 55%, #b79bff); }
 .swatch.galaxy { background: linear-gradient(135deg, #27d3c3, #7b5cff 55%, #ff5fa2); }
 
 main { max-width: 1320px; margin: 0 auto; padding: 18px 20px 60px; min-height: 70vh; }
@@ -182,6 +198,17 @@ select, textarea { font: inherit; color: inherit; background: var(--card); borde
 .reports div { display: grid; gap: 6px; align-content: start; min-width: 0; }
 .reports p { margin: 0; overflow-wrap: anywhere; }
 .reports small { color: var(--muted); }
+
+.profile { position: relative; }
+.profile.has-cover { padding-top: 150px; }
+.cover { position: absolute; inset: 0 0 auto 0; height: 200px; background: center / cover no-repeat; border-radius: 6px; }
+.cover::after { content: ""; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(to bottom, transparent 40%, var(--bg)); }
+.profile.has-cover > :not(.cover) { position: relative; }
+.profile.has-cover .avatar.xl { box-shadow: 0 0 0 4px var(--bg); }
+.account-links { flex-wrap: wrap; justify-content: center; }
+.cover-link { align-self: flex-start; font-size: 12px; }
+.foot nav { flex-wrap: wrap; }
+.foot .link { text-decoration: underline; font-size: 12px; padding: 0; }
 
 @media (max-width: 720px) {
   .top { padding: 10px 12px; }
