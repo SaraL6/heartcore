@@ -26,6 +26,9 @@ and take everything with you whenever you want.
 - **Friends** — follow people and see what they heart, in the order it happened
 - **Your canvas** — pick any image as your profile cover; visitors see your
   page in the theme you chose (pastel, soft grunge, galaxy, vintage, daydream)
+- **Make it yours** — a mood, your own profile colour, a top 8 of your
+  favourite people, a guestbook for friends to sign, and a little visit counter
+- **Notes** — see who else hearted an image
 - **Music** — paste a Spotify link to listen while you browse, and put a
   playlist on your profile for visitors to play
 - **Take it with you** — "download everything" saves your hearts, posts and
@@ -38,7 +41,7 @@ and take everything with you whenever you want.
 | | |
 | --- | --- |
 | ![A profile with a cover image, in the daydream theme](docs/screenshots/profile.jpg) | ![The friends feed, in the soft grunge theme](docs/screenshots/friends.jpg) |
-| A profile, dressed in its owner's theme | The friends feed |
+| A profile in its owner's theme and colour, with mood, visit counter and top 8 | The friends feed |
 | ![An open image with collections and credit](docs/screenshots/image.jpg) | <img src="docs/screenshots/phone.jpg" alt="Discover on a phone, in the galaxy theme" width="260"> |
 | Saving to a collection, with photographer credit | On a phone |
 
@@ -55,7 +58,7 @@ Supabase, so the database itself has to enforce who can do what.
   (saving a library image once, resolving a report, deleting an account) are
   narrow `security definer` functions. See [`supabase/schema.sql`](supabase/schema.sql).
 - **Those rules are tested.** [`supabase/tests/rules.test.sql`](supabase/tests/rules.test.sql)
-  runs 40 checks against a real Postgres in CI — for example that you can't
+  runs 55 checks against a real Postgres in CI — for example that you can't
   heart as someone else, forge a count, read reports, or make yourself an admin.
 - **Instant-feeling UI.** Hearts and follows update immediately and roll back
   if the server refuses.
@@ -74,6 +77,7 @@ Supabase, so the database itself has to enforce who can do what.
 | `src/api.ts` | Every other database read and write, and the export. |
 | `src/images.ts`, `src/openverse.ts`, `src/unsplash.ts` | Image search: Unsplash if a key is set, otherwise Openverse. |
 | `src/music.tsx` | The Spotify mini player. |
+| `src/profile.tsx` | Profile extras: mood, colour, top 8, guestbook, visit counter. |
 | `src/App.tsx`, `src/components.tsx` | Pages and building blocks. |
 | `src/legal.tsx` | Rules, terms, privacy and copyright pages. |
 | `supabase/schema.sql` | Tables, access rules, triggers, storage, reports and moderation. |
@@ -154,6 +158,7 @@ Cloudflare Pages or GitHub Pages. Set `VITE_SUPABASE_URL` and
 
 ## What's next
 
+- Text and quote posts, and reblogging with your own caption
 - Postcards: send an image to a friend with a note
 - A collage maker for moodboards and wallpapers
 - "On this day": what you hearted a year ago
