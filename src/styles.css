@@ -210,8 +210,22 @@ select, textarea { font: inherit; color: inherit; background: var(--card); borde
 .foot nav { flex-wrap: wrap; }
 .foot .link { text-decoration: underline; font-size: 12px; padding: 0; }
 
+.music-btn { border-radius: 50%; width: 30px; height: 30px; padding: 0; line-height: 1; }
+.music-btn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.music { position: fixed; right: 16px; bottom: 16px; z-index: 8; width: min(340px, calc(100vw - 32px)); background: var(--card); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 10px 40px #0004; overflow: hidden; }
+.music header { display: flex; align-items: center; gap: 12px; padding: 8px 12px; font-size: 13px; }
+.music header span { margin-right: auto; }
+.music iframe { display: block; width: 100%; border: 0; }
+.music.small iframe { height: 0; }
+.music-controls { display: grid; gap: 6px; padding: 10px 12px 12px; }
+.music-controls .link { justify-self: start; text-decoration: underline; font-size: 12px; }
+
 @media (max-width: 720px) {
-  .top { padding: 10px 12px; }
+  .top { padding: 10px 12px; column-gap: 10px; }
+  .top .primary { padding: 6px 10px; }
+  .logo { font-size: 19px; }
+  .themes { gap: 4px; }
+  .swatch { width: 16px; height: 16px; }
   .search { order: 5; flex-basis: 100%; max-width: none; }
   .main-nav { order: 6; margin: 0; flex: 1; justify-content: space-between; }
   .logo { margin-right: auto; }

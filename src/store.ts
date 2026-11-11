@@ -26,8 +26,8 @@ export type Img = {
   heartCount: number
   via?: string // "hearted by" username, in the friends feed
 }
-export type Profile = { id: string; username: string; bio: string; cover_url?: string | null; theme?: Theme }
-export const PROFILE_COLS = 'id, username, bio, cover_url, theme'
+export type Profile = { id: string; username: string; bio: string; cover_url?: string | null; theme?: Theme; music?: string | null }
+export const PROFILE_COLS = 'id, username, bio, cover_url, theme, music'
 export type Collection = { id: string; name: string; userId: string; images: Img[] }
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined
@@ -44,16 +44,19 @@ type State = {
   theme: Theme
   visitTheme: Theme | null // while looking at someone's profile, you see it their way
   quiet: boolean // hide heart counts
+  music: string | null // Spotify "type/id" in the player
+  musicOpen: boolean
   authOpen: boolean
   toast: string
   rev: number // bumped when lists should reload (after posting or deleting)
 }
 
 const savedQuiet = (() => { try { return localStorage.getItem('heartcore:quiet') === '1' } catch { return false } })()
+const savedMusic = (() => { try { return localStorage.getItem('heartcore:music') } catch { return null } })()
 const savedTheme = (() => { try { return localStorage.getItem('heartcore:theme') as Theme | null } catch { return null } })()
 let state: State = {
   ready: !supabase, me: null, isAdmin: false, hearted: {}, counts: {}, following: [],
-  theme: savedTheme ?? 'pastel', visitTheme: null, quiet: savedQuiet, authOpen: false, toast: '', rev: 0,
+  theme: savedTheme ?? 'pastel', visitTheme: null, quiet: savedQuiet, music: savedMusic, musicOpen: false, authOpen: false, toast: '', rev: 0,
 }
 const listeners = new Set<() => void>()
 const set = (patch: Partial<State>) => { state = { ...state, ...patch }; listeners.forEach((l) => l()) }
@@ -67,7 +70,6 @@ export function toast(message: string) {
   toastTimer = window.setTimeout(() => set({ toast: '' }), 4000)
 }
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export const SELECT_IMG = '*, uploader:profiles(id, username)'
 export function toImg(r: any, via?: string): Img {
   return {
@@ -148,6 +150,11 @@ export const actions = {
     }
   },
   setVisitTheme: (visitTheme: Theme | null) => set({ visitTheme }),
+  setMusicOpen: (musicOpen: boolean) => set({ musicOpen }),
+  setMusic(music: string) {
+    try { localStorage.setItem('heartcore:music', music) } catch { /* private mode */ }
+    set({ music, musicOpen: true })
+  },
   toggleQuiet() {
     try { localStorage.setItem('heartcore:quiet', state.quiet ? '0' : '1') } catch { /* private mode */ }
     set({ quiet: !state.quiet })
