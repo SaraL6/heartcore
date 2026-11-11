@@ -220,6 +220,25 @@ select, textarea { font: inherit; color: inherit; background: var(--card); borde
 .music-controls { display: grid; gap: 6px; padding: 10px 12px 12px; }
 .music-controls .link { justify-self: start; text-decoration: underline; font-size: 12px; }
 
+.textpost { container-type: inline-size; display: grid; place-items: center; width: 100%; min-height: 150px; aspect-ratio: 4 / 3; overflow: hidden; }
+.textpost p { margin: 0; padding: 8cqw; text-align: center; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 9cqw; line-height: 1.25; }
+.textpost.medium p { font-size: 6.5cqw; }
+.textpost.long p { font-size: 4.6cqw; }
+.textpost.long { aspect-ratio: 1; }
+.textpost.ink { background: #111; color: #fff; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.textpost.paper { background: #fbfaf6; color: #2a2530; font-family: "Courier New", Courier, monospace; }
+.textpost.blush { background: linear-gradient(135deg, #ffd6e0, #e2d4ff); color: #3a2f45; font-family: Georgia, "Times New Roman", serif; font-style: italic; }
+.textpost.night { background: linear-gradient(180deg, #0a0f2c, #3b2460); color: #fdf3d0; font-family: Georgia, "Times New Roman", serif; }
+.post-media > .textpost { align-self: stretch; min-height: 320px; aspect-ratio: auto; }
+.mosaic .textpost { height: 100%; min-height: 0; aspect-ratio: auto; }
+.mode { display: flex; gap: 6px; }
+.mode button { flex: 1; }
+.mode button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.styles { display: flex; gap: 8px; }
+.styles .textpost { width: 54px; min-height: 0; height: 40px; aspect-ratio: auto; padding: 0; font-size: 14px; border: 2px solid var(--line); container-type: normal; }
+.styles .textpost[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--accent); }
+.upload > .textpost { border-radius: var(--radius); max-height: 240px; }
+.reports blockquote { margin: 0; width: 140px; padding: 10px; background: var(--chip); border-radius: var(--radius); font-style: italic; overflow-wrap: anywhere; }
 .panels { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 14px; margin-bottom: 22px; }
 .panel { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); overflow: hidden; }
 .panel h2 { margin: 0; padding: 6px 12px; font: 700 12px var(--font); letter-spacing: 1px; text-transform: lowercase; background: var(--accent); color: var(--accent-ink); }

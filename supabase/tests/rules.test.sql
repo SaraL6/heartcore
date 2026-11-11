@@ -30,6 +30,11 @@ select t_refused($$insert into images (url, uploader_id, heart_count) values ('h
 select t_refused($$insert into images (url, uploader_id) values ('javascript:alert(1)', auth.uid())$$, 'posting a non-web address');
 select t_refused($$update images set heart_count = 500$$, 'editing heart counts');
 select t_refused($$update images set removed = false$$, 'un-removing images');
+select t_rows($$insert into images (kind, body, style, uploader_id) values ('text', 'stay weird', 'ink', auth.uid())$$, 1, 'posting words');
+select t_refused($$insert into images (kind, body, uploader_id) values ('text', '   ', auth.uid())$$, 'an empty text post');
+select t_refused($$insert into images (kind, body, url, uploader_id) values ('text', 'hi', 'https://x/y.jpg', auth.uid())$$, 'a text post that also carries a picture');
+select t_refused($$insert into images (kind, uploader_id) values ('image', auth.uid())$$, 'an image post with no picture');
+select t_refused($$insert into images (kind, body, style, uploader_id) values ('text', 'hi', 'comic-sans', auth.uid())$$, 'an unknown card style');
 insert into collections (user_id, name) values (auth.uid(), 'faves') returning id as coll \gset
 insert into collection_images values (:'coll', :'ext');
 insert into follows (follower_id, following_id) values (auth.uid(), :'mia');
@@ -78,7 +83,7 @@ select t_refused($$select admin_resolve_report((select gen_random_uuid()), true)
 
 -- ===== not signed in =====
 reset role; set role anon; set request.jwt.claim.sub = '';
-select t_is($$select count(*)::text from images$$, '2', 'anyone can browse');
+select t_is($$select count(*)::text from images$$, '3', 'anyone can browse');
 select t_refused($$select save_external_image('openverse', 'zzz', 'https://x/y.jpg', null, 1, 1, '', '{}', '', '', '')$$, 'saving images while signed out');
 select t_refused(format($$insert into hearts values (%L, %L)$$, :'lena', :'ext'), 'hearting while signed out');
 insert into reports (provider, provider_id, url, reason, contact) values ('openverse', 'abc', 'https://x/y.jpg', 'copyright', 'owner@example.com');
@@ -94,7 +99,7 @@ set role authenticated; set request.jwt.claim.sub = :'lena';
 select t_is($$select count(*)::text from reports where status = 'open'$$, '2', 'admins can read reports');
 select admin_resolve_report(:'rep', true);
 select t_is($$select count(*)::text from reports where status = 'open'$$, '0', 'a takedown closes every report on that picture');
-select t_is($$select count(*)::text from images$$, '1', 'a removed picture is hidden from everyone');
+select t_is($$select count(*)::text from images$$, '2', 'a removed picture is hidden from everyone');
 select t_is($$select bool_and(removed)::text from external_status('openverse', '{abc}')$$, 'true', 'the library lookup reports it as removed');
 select t_is(format($$select coalesce(cover_url, 'none') from profiles where id = %L$$, :'mia'), 'none', 'a takedown clears it from profile covers');
 

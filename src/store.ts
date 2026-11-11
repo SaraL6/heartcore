@@ -11,6 +11,9 @@ export type Img = {
   id?: string
   key: string
   provider: string // 'upload' or the name of an image API
+  kind?: 'text' // a post made of words; `body` and `style` are set and `url` is empty
+  body?: string
+  style?: string
   providerId?: string
   url: string
   thumb?: string
@@ -79,7 +82,8 @@ export function toImg(r: any, via?: string): Img {
     id: r.id,
     key: r.provider === 'upload' ? r.id : `${r.provider}:${r.provider_id}`,
     provider: r.provider, providerId: r.provider_id ?? undefined,
-    url: r.url, thumb: r.thumb ?? undefined, width: r.width ?? undefined, height: r.height ?? undefined,
+    kind: r.kind === 'text' ? 'text' : undefined, body: r.body ?? undefined, style: r.style ?? undefined,
+    url: r.url ?? '', thumb: r.thumb ?? undefined, width: r.width ?? undefined, height: r.height ?? undefined,
     caption: r.caption ?? '', tags: r.tags ?? [], credit: r.credit ?? undefined,
     sourceUrl: r.source_url ?? undefined, license: r.license ?? undefined,
     uploader: r.uploader ?? undefined, heartCount: r.heart_count ?? 0, via,

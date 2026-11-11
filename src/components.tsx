@@ -27,8 +27,15 @@ export function useLoad<T>(fn: () => Promise<T>, deps: unknown[]) {
   return state
 }
 
+/** A post made of words, drawn as a typographic card. */
+export function TextCard({ body, style }: { body: string; style?: string }) {
+  const size = body.length > 160 ? 'long' : body.length > 70 ? 'medium' : 'short'
+  return <div className={`textpost ${style ?? 'ink'} ${size}`}><p>{body}</p></div>
+}
+
 export function Media({ img, onDead }: { img: Img; onDead?: () => void }) {
   const [src, setSrc] = useState(img.url)
+  if (img.kind === 'text') return <TextCard body={img.body ?? ''} style={img.style} />
   return (
     <img
       src={src} alt={img.caption || 'image'} loading="lazy"
@@ -249,7 +256,7 @@ export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
           <HeartButton img={img} big />
           {img.id && <Notes imageId={img.id} total={heartCount(s, img)} onNavigate={onClose} />}
           <SaveToCollection img={img} />
-          {me && (
+          {me && img.kind !== 'text' && (
             <button className="danger cover-link" onClick={async () => {
               try { await api.setCover(me.id, img.url); actions.setMe({ ...me, cover_url: img.url }); actions.refresh(); toast('this is now your profile cover ♥') } catch (e) { console.error(e); toast('could not set your cover') }
             }}>use as my profile cover</button>
@@ -291,6 +298,9 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
   const [over, setOver] = useState(false)
   const input = useRef<HTMLInputElement>(null)
   const previewEl = useRef<HTMLImageElement>(null)
+  const [mode, setMode] = useState<'image' | 'words'>('image')
+  const [words, setWords] = useState('')
+  const [style, setStyle] = useState<string>('ink')
 
   useEffect(() => {
     if (!file) { setPreview(url.trim()); return }
@@ -310,6 +320,16 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
     e.preventDefault()
     const src = url.trim()
     if (!me) return
+    if (mode === 'words') {
+      const body = words.trim()
+      if (!body) return setError('write a few words first')
+      setBusy(true)
+      try {
+        await api.createTextPost(me.id, { body, style, tags: [...new Set(tags.toLowerCase().split(/[\s,#]+/).filter(Boolean))].slice(0, 8) })
+        actions.refresh(); onClose(); location.hash = `#/u/${me.username}/posts`
+      } catch (err) { console.error(err); setError(`could not post that: ${errorText(err)}`); setBusy(false) }
+      return
+    }
     if (!file && !/^https:\/\//i.test(src)) return setError('pick an image or paste a link starting with https://')
     setBusy(true)
     try {
@@ -335,6 +355,24 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose} label="New post">
       <form className="upload" onSubmit={submit}>
         <h2>post something you love</h2>
+        <div className="mode" role="tablist">
+          <button type="button" role="tab" aria-selected={mode === 'image'} onClick={() => { setMode('image'); setError('') }}>an image</button>
+          <button type="button" role="tab" aria-selected={mode === 'words'} onClick={() => { setMode('words'); setError('') }}>some words</button>
+        </div>
+        {mode === 'words' ? (
+          <>
+            <TextCard body={words || 'stay weird'} style={style} />
+            <label>your words
+              <textarea value={words} onChange={(e) => setWords(e.target.value)} maxLength={280} rows={3} placeholder="a quote, a thought, a lyric you wrote…" />
+            </label>
+            <div className="styles" role="group" aria-label="Card style">
+              {api.TEXT_STYLES.map((t) => (
+                <button key={t} type="button" className={`textpost ${t}`} aria-pressed={style === t} aria-label={`${t} style`} onClick={() => setStyle(t)}>Aa</button>
+              ))}
+            </div>
+          </>
+        ) : (
+          <>
         <div
           className={`drop${over ? ' over' : ''}`}
           onDragOver={(e) => { e.preventDefault(); setOver(true) }}
@@ -353,10 +391,12 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         <label>caption
           <input value={caption} onChange={(e) => setCaption(e.target.value)} maxLength={140} placeholder="optional" />
         </label>
+          </>
+        )}
         <label>tags
           <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="grunge, pastel, summer" />
         </label>
-        <p className="muted small">Only post things you made or have permission to share — no AI-generated images — and nothing that breaks the <a className="underline" href="#/about/rules" target="_blank" rel="noreferrer">rules</a>.</p>
+        <p className="muted small">Only post things you made or have permission to share — no AI-generated images, and credit words that aren't yours — and nothing that breaks the <a className="underline" href="#/about/rules" target="_blank" rel="noreferrer">rules</a>.</p>
         {error && <p className="error" role="alert">{error}</p>}
         <button className="primary" type="submit" disabled={busy}>{busy ? 'posting…' : 'post it ♥'}</button>
       </form>

@@ -379,3 +379,23 @@ drop policy if exists "remove guestbook note" on public.guestbook;
 create policy "remove guestbook note" on public.guestbook for delete to authenticated
   using (author_id = auth.uid() or profile_id = auth.uid() or public.is_admin());
 revoke update on public.guestbook from anon, authenticated;
+
+-- ---------- text posts ----------
+-- A post can be words instead of a picture. It lives in the same table so it
+-- can be hearted, collected and reported like anything else.
+alter table public.images add column if not exists kind text not null default 'image'
+  check (kind in ('image', 'text'));
+alter table public.images add column if not exists body text
+  check (body is null or char_length(btrim(body)) between 1 and 280);
+alter table public.images add column if not exists style text
+  check (style is null or style in ('ink', 'paper', 'blush', 'night'));
+alter table public.images alter column url drop not null;
+alter table public.images drop constraint if exists images_content_check;
+alter table public.images add constraint images_content_check check (
+  (kind = 'image' and url is not null and body is null)
+  or (kind = 'text' and body is not null and url is null and provider = 'upload')
+);
+
+-- A report on a text post has no picture address; it carries the words instead.
+alter table public.reports alter column url drop not null;
+alter table public.reports add column if not exists excerpt text check (excerpt is null or char_length(excerpt) <= 300);

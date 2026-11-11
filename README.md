@@ -22,7 +22,8 @@ and take everything with you whenever you want.
 - **Discover** — endless scroll of real photos with search and tags, from
   Unsplash or Openverse
 - **Hearts and collections** — heart anything, organise it into collections
-- **Post** — upload a jpg/png/gif or share an image link, with caption and tags
+- **Post** — upload a jpg/png/gif, share an image link, or post some words
+  as a quote card in one of four styles
 - **Friends** — follow people and see what they heart, in the order it happened
 - **Your canvas** — pick any image as your profile cover; visitors see your
   page in the theme you chose (pastel, soft grunge, galaxy, vintage, daydream)
@@ -58,7 +59,7 @@ Supabase, so the database itself has to enforce who can do what.
   (saving a library image once, resolving a report, deleting an account) are
   narrow `security definer` functions. See [`supabase/schema.sql`](supabase/schema.sql).
 - **Those rules are tested.** [`supabase/tests/rules.test.sql`](supabase/tests/rules.test.sql)
-  runs 55 checks against a real Postgres in CI — for example that you can't
+  runs 60 checks against a real Postgres in CI — for example that you can't
   heart as someone else, forge a count, read reports, or make yourself an admin.
 - **Instant-feeling UI.** Hearts and follows update immediately and roll back
   if the server refuses.
@@ -158,7 +159,7 @@ Cloudflare Pages or GitHub Pages. Set `VITE_SUPABASE_URL` and
 
 ## What's next
 
-- Text and quote posts, and reblogging with your own caption
+- Reblogging with your own caption, and an ask box on profiles
 - Postcards: send an image to a friend with a note
 - A collage maker for moodboards and wallpapers
 - "On this day": what you hearted a year ago

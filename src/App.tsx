@@ -419,7 +419,9 @@ function AdminPage() {
         <ul className="reports">
           {data.map((r) => (
             <li key={r.id}>
-              <a href={r.url} target="_blank" rel="noreferrer noopener"><img src={r.url} alt="reported" loading="lazy" /></a>
+              {r.url
+                ? <a href={r.url} target="_blank" rel="noreferrer noopener"><img src={r.url} alt="reported" loading="lazy" /></a>
+                : <blockquote>{r.excerpt}</blockquote>}
               <div>
                 <strong>{label(r.reason)}</strong>
                 {r.details && <p>{r.details}</p>}
