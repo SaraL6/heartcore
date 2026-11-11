@@ -74,7 +74,7 @@ export default function App() {
       </header>
       <main>{page}</main>
       <footer className="foot">
-        made with ♥ for the tumblr kids · photos from <a href="https://openverse.org" target="_blank" rel="noreferrer noopener">Openverse</a>, shared by their creators under Creative Commons licenses
+        made with ♥ for the tumblr kids · no ads, no tracking, ever · photos from <a href="https://openverse.org" target="_blank" rel="noreferrer noopener">Openverse</a>, shared by their creators under Creative Commons licenses
         <nav>
           {LEGAL_LINKS.map(([path, label]) => <a key={path} href={`#/about/${path}`}>{label}</a>)}
           {s.isAdmin && <a href="#/admin">moderation</a>}

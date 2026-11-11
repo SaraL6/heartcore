@@ -3,6 +3,9 @@
 A cozy, nostalgic place to heart and collect images — a love letter to the
 image-bookmarking sites of the Tumblr era (2010–2014).
 
+**No ads, no tracking, no algorithm deciding what you see.** Friends' hearts
+show up in the order they happened, and that's it.
+
 ## What's in it
 
 - **Discover** — endless scroll of real photos from [Openverse](https://openverse.org)
