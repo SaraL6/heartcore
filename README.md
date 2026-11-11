@@ -94,7 +94,7 @@ Cloudflare Pages or GitHub Pages. Set `VITE_SUPABASE_URL` and
 
 | File | What it does |
 | --- | --- |
-| `src/openverse.ts` | Image search. Swap or add another image API here. |
+| `src/images.ts`, `src/openverse.ts`, `src/unsplash.ts` | Image search: Unsplash if `VITE_UNSPLASH_ACCESS_KEY` is set, otherwise Openverse. |
 | `src/store.ts` | Signed-in state: who you are, what you've hearted, who you follow. |
 | `src/api.ts` | Every other database read and write. |
 | `src/App.tsx`, `src/components.tsx` | Pages and building blocks. |

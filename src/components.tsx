@@ -230,8 +230,12 @@ export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
             </div>
           ) : (
             <p className="credit">
-              photo{img.credit ? <> by <strong>{img.credit}</strong></> : ''}
-              {img.license && <> · {img.license}</>}
+              photo{img.credit ? <> by {img.creditUrl
+                ? <a href={img.creditUrl} target="_blank" rel="noreferrer noopener"><strong>{img.credit}</strong></a>
+                : <strong>{img.credit}</strong>}</> : ''}
+              {img.provider === 'unsplash'
+                ? <> on <a className="underline" href="https://unsplash.com/?utm_source=heartcore&utm_medium=referral" target="_blank" rel="noreferrer noopener">Unsplash</a></>
+                : img.license && <> · {img.license}</>}
               {img.sourceUrl && <> · <a href={img.sourceUrl} target="_blank" rel="noreferrer noopener">view original ↗</a></>}
             </p>
           )}

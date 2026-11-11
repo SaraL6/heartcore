@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as api from './api'
 import { AuthModal, FollowButton, Grid, HeartIcon, Media, PostModal, UploadModal, useLoad } from './components'
 import { LEGAL_LINKS, LegalPage } from './legal'
-import { searchImages } from './openverse'
+import { LIBRARY, searchImages } from './images'
 import { actions, initAuth, requireMe, supabase, toast, useStore, type Collection, type Img, type Profile, type Theme } from './store'
 
 function useRoute() {
@@ -77,7 +77,7 @@ export default function App() {
       </header>
       <main>{page}</main>
       <footer className="foot">
-        made with ♥ for the tumblr kids · no ads, no tracking, ever · photos from <a href="https://openverse.org" target="_blank" rel="noreferrer noopener">Openverse</a>, shared by their creators under Creative Commons licenses
+        made with ♥ for the tumblr kids · no ads, no tracking, ever · photos from <a href={LIBRARY.url} target="_blank" rel="noreferrer noopener">{LIBRARY.name}</a>, {LIBRARY.note}
         <nav>
           {LEGAL_LINKS.map(([path, label]) => <a key={path} href={`#/about/${path}`}>{label}</a>)}
           <button className="link" aria-pressed={s.quiet} onClick={actions.toggleQuiet}>{s.quiet ? 'show heart counts' : 'hide heart counts'}</button>

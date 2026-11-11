@@ -12,7 +12,7 @@ type OvImage = {
   width?: number; height?: number; tags?: { name: string }[]
 }
 
-export async function searchImages(q: string, page: number): Promise<{ items: Img[]; hasMore: boolean }> {
+export async function searchOpenverse(q: string, page: number): Promise<{ items: Img[]; hasMore: boolean }> {
   const u = new URL(API)
   const params: Record<string, string> = { q, page: String(page), page_size: String(PAGE_SIZE), source: 'flickr' }
   // If the site ever earns money (ads, paid features), set this so Discover

@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { createClient } from '@supabase/supabase-js'
+import { trackUse } from './unsplash'
 
 export type Theme = 'pastel' | 'grunge' | 'galaxy' | 'vintage' | 'dream'
 
@@ -18,6 +19,7 @@ export type Img = {
   caption: string
   tags: string[]
   credit?: string
+  creditUrl?: string
   sourceUrl?: string
   license?: string
   uploader?: { id: string; username: string }
@@ -122,6 +124,7 @@ export async function ensureSaved(img: Img): Promise<string> {
     p_credit: img.credit ?? null, p_source_url: img.sourceUrl ?? null, p_license: img.license ?? null,
   })
   if (error) throw error
+  trackUse(img)
   img.id = data as string
   return img.id
 }

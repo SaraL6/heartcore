@@ -37,7 +37,7 @@ const PAGES: Record<string, { title: string; body: React.ReactNode }> = {
         <h3>What we may do</h3>
         <p>We may remove any content and close any account that breaks these terms or the rules, and we close the accounts of people who repeatedly post things that infringe copyright.</p>
         <h3>Photos from elsewhere</h3>
-        <p>Photos in Discover come from Openverse and belong to their creators, who shared them under Creative Commons licenses. Each one links to its original and license. Hearting or saving a photo does not give you rights to it.</p>
+        <p>Photos in Discover come from open photo libraries (Openverse or Unsplash) and belong to their creators. Each one credits its creator and links to its original. Hearting or saving a photo does not give you rights to it.</p>
         <h3>No guarantees</h3>
         <p>This is a free community project, provided as it is, with no promise that it will always be available or that nothing will be lost. To the extent the law allows, the people running it are not liable for losses from using it.</p>
         <h3>Contact</h3>
@@ -58,7 +58,7 @@ const PAGES: Record<string, { title: string; body: React.ReactNode }> = {
         <h3>What we don't do</h3>
         <p>No ads, no tracking, no selling or sharing your data.</p>
         <h3>Who helps run it</h3>
-        <p>Accounts, data and uploads are stored with Supabase. Discover photos are loaded from Openverse and Flickr, which see your IP address when your browser fetches them, as any website does.</p>
+        <p>Accounts, data and uploads are stored with Supabase. Discover photos are loaded from Openverse, Flickr or Unsplash, which see your IP address when your browser fetches them, as any website does.</p>
         <h3>Your choices</h3>
         <p>You can delete any post, and you can delete your whole account from your profile — that erases your profile, posts, hearts, collections and follows. To ask for a copy of your data or anything else, write to <Contact />.</p>
       </>
