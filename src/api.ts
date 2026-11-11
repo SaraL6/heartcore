@@ -107,6 +107,42 @@ export async function setInCollection(collectionId: string, img: Img, on: boolea
 }
 
 export async function updateBio(id: string, bio: string) { ok(await db().from('profiles').update({ bio }).eq('id', id)) }
+export async function updateProfile(id: string, patch: Partial<Pick<Profile, 'bio' | 'mood' | 'accent' | 'cover_url'>>) {
+  ok(await db().from('profiles').update(patch).eq('id', id))
+}
+
+// ---------- profile extras ----------
+
+export type Friend = { id: string; username: string; cover_url: string | null }
+export async function topFriends(profileId: string): Promise<Friend[]> {
+  const rows = ok(await db().from('top_friends')
+    .select('position, friend:profiles!top_friends_friend_id_fkey(id, username, cover_url)')
+    .eq('user_id', profileId).order('position')) as any[]
+  return rows.map((r) => r.friend).filter(Boolean)
+}
+
+export type Entry = { id: string; body: string; created_at: string; author: { id: string; username: string } }
+export async function guestbook(profileId: string): Promise<Entry[]> {
+  const rows = ok(await db().from('guestbook')
+    .select('id, body, created_at, author:profiles!guestbook_author_id_fkey(id, username)')
+    .eq('profile_id', profileId).order('created_at', { ascending: false }).limit(60)) as any[]
+  return rows.filter((r) => r.author)
+}
+export async function signGuestbook(profileId: string, authorId: string, body: string) {
+  ok(await db().from('guestbook').insert({ profile_id: profileId, author_id: authorId, body }))
+}
+export async function deleteEntry(id: string) { ok(await db().from('guestbook').delete().eq('id', id)) }
+
+export async function bumpViews(profileId: string): Promise<number | null> {
+  return ok(await db().rpc('bump_profile_views', { p_profile: profileId })) as number | null
+}
+
+/** Usernames of the latest people to heart an image. */
+export async function notes(imageId: string): Promise<string[]> {
+  const rows = ok(await db().from('hearts').select('who:profiles(username)')
+    .eq('image_id', imageId).order('created_at', { ascending: false }).limit(6)) as any[]
+  return rows.map((r) => r.who?.username).filter(Boolean)
+}
 export async function setCover(id: string, url: string | null) { ok(await db().from('profiles').update({ cover_url: url }).eq('id', id)) }
 
 // ---------- take your things with you ----------

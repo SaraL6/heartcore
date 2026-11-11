@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as api from './api'
+import { Notes } from './profile'
 import { actions, fmt, heartCount, requireMe, supabase, toast, useStore, type Img } from './store'
 
 export const HeartIcon = ({ filled }: { filled?: boolean }) => (
@@ -202,7 +203,8 @@ function ReportForm({ img, onDone }: { img: Img; onDone: () => void }) {
 }
 
 export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
-  const { me, hearted } = useStore()
+  const s = useStore()
+  const { me, hearted } = s
   const [burst, setBurst] = useState(0)
   const [reporting, setReporting] = useState(false)
   const love = () => {
@@ -245,6 +247,7 @@ export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
             </div>
           )}
           <HeartButton img={img} big />
+          {img.id && <Notes imageId={img.id} total={heartCount(s, img)} onNavigate={onClose} />}
           <SaveToCollection img={img} />
           {me && (
             <button className="danger cover-link" onClick={async () => {

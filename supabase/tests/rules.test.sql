@@ -42,8 +42,27 @@ select t_refused($$update profiles set id = gen_random_uuid() where id = auth.ui
 select t_refused($$insert into admins values (auth.uid())$$, 'making yourself an admin');
 select t_is($$select is_admin()::text$$, 'false', 'members are not admins');
 
+select t_refused($$update profiles set views = 99999 where id = auth.uid()$$, 'setting your own visit count');
+select t_refused($$update profiles set accent = 'red; background:url(x)' where id = auth.uid()$$, 'a profile colour that is not a plain hex colour');
+select t_rows($$update profiles set accent = '#ff5c8a', mood = 'dreamy' where id = auth.uid()$$, 1, 'setting your mood and colour');
+select t_is(format($$select coalesce(bump_profile_views(%L), -1)::text$$, :'lena'), '-1', 'your own visits are not counted');
+select t_is(format($$select bump_profile_views(%L)::text$$, :'mia'), '1', 'visiting someone counts once per call');
+insert into top_friends (user_id, friend_id, position) values (auth.uid(), :'mia', 1);
+select t_refused(format($$insert into top_friends (user_id, friend_id, position) values (auth.uid(), %L, 1)$$, '00000000-0000-0000-0000-00000000000c'), 'two friends in the same top-8 slot');
+select t_refused(format($$insert into top_friends (user_id, friend_id, position) values (auth.uid(), %L, 9)$$, '00000000-0000-0000-0000-00000000000c'), 'a ninth top-8 slot');
+select t_refused($$insert into top_friends (user_id, friend_id, position) values (auth.uid(), auth.uid(), 2)$$, 'putting yourself in your top 8');
+select t_refused(format($$insert into top_friends (user_id, friend_id, position) values (%L, auth.uid(), 1)$$, :'mia'), 'editing someone else''s top 8');
+insert into guestbook (profile_id, author_id, body) values (:'mia', auth.uid(), 'hi mia!');
+insert into guestbook (profile_id, author_id, body) values (:'lena', auth.uid(), 'note to self');
+select t_refused(format($$insert into guestbook (profile_id, author_id, body) values (auth.uid(), %L, 'forged')$$, :'mia'), 'signing a guestbook as someone else');
+select t_refused($$insert into guestbook (profile_id, author_id, body) values (auth.uid(), auth.uid(), '   ')$$, 'an empty guestbook note');
+
 -- ===== signed in as mia =====
 set request.jwt.claim.sub = :'mia';
+select t_rows($$delete from top_friends$$, 0, 'cannot edit other people''s top 8');
+select t_refused($$update guestbook set body = 'edited'$$, 'editing guestbook notes');
+select t_rows(format($$delete from guestbook where profile_id = %L$$, :'lena'), 0, 'cannot remove notes on someone else''s profile');
+select t_rows(format($$delete from guestbook where profile_id = %L$$, :'mia'), 1, 'can remove notes left on your own profile');
 select t_refused(format($$insert into collection_images values (%L, %L)$$, :'coll', :'ext'), 'adding to someone else''s collection');
 select t_rows($$delete from hearts$$, 0, 'cannot remove other people''s hearts');
 select t_rows($$delete from images$$, 0, 'cannot delete other people''s posts');
