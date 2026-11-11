@@ -30,8 +30,8 @@ and take everything with you whenever you want.
 - **Make it yours** — a mood, your own profile colour, a top 8 of your
   favourite people, a guestbook for friends to sign, and a little visit counter
 - **Notes** — see who else hearted an image
-- **Music** — paste a Spotify link to listen while you browse, and put a
-  playlist on your profile for visitors to play
+- **Music** — paste a Spotify link to listen while you browse, connect your
+  Spotify for full songs, and put a playlist on your profile for visitors to play
 - **Take it with you** — "download everything" saves your hearts, posts and
   collections as one web page, so they can never vanish
 - **Human-made only** — no AI-generated images; no ads; no tracking; heart
@@ -77,7 +77,7 @@ Supabase, so the database itself has to enforce who can do what.
 | `src/store.ts` | Signed-in state: who you are, what you've hearted, who you follow. |
 | `src/api.ts` | Every other database read and write, and the export. |
 | `src/images.ts`, `src/openverse.ts`, `src/unsplash.ts` | Image search: Unsplash if a key is set, otherwise Openverse. |
-| `src/music.tsx` | The Spotify mini player. |
+| `src/music.tsx`, `src/spotify.ts` | The music player, and Spotify sign-in (PKCE) with in-page full-song playback. |
 | `src/profile.tsx` | Profile extras: mood, colour, top 8, guestbook, visit counter. |
 | `src/App.tsx`, `src/components.tsx` | Pages and building blocks. |
 | `src/legal.tsx` | Rules, terms, privacy and copyright pages. |
@@ -123,6 +123,23 @@ Good to know:
   **Authentication → URL Configuration** so confirmation links come back to it.
 - The anon key is safe to ship in the site. Never put the `service_role` key
   in `.env.local` or anywhere in this repo.
+
+## Full songs with Spotify (optional)
+
+Without this, the music player is Spotify's embed, which plays 30-second
+previews unless the browser lets it see the listener's Spotify login. With
+it, people can press "connect Spotify" and play full songs inside the page
+(Spotify Premium, computer browsers only).
+
+1. At [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard),
+   create an app. Under APIs, tick **Web Playback SDK** and **Web API**.
+2. Add your site's address, with the trailing slash, as a **Redirect URI**,
+   for example `https://heartcore-tau.vercel.app/`.
+3. Copy the **Client ID** (never the client secret) and set it as
+   `VITE_SPOTIFY_CLIENT_ID`, then redeploy.
+4. Under **User Management**, add the Spotify email of each person who should
+   be able to connect. Spotify allows only a small number of hand-added people
+   until it approves an app for wider use; everyone else keeps the previews.
 
 ## Before you open a copy to the public
 

@@ -58,7 +58,7 @@ const PAGES: Record<string, { title: string; body: React.ReactNode }> = {
         <h3>What we don't do</h3>
         <p>No ads, no tracking, no selling or sharing your data.</p>
         <h3>Who helps run it</h3>
-        <p>Accounts, data and uploads are stored with Supabase. Discover photos are loaded from Openverse, Flickr or Unsplash, which see your IP address when your browser fetches them, as any website does. If you open the music player, it is Spotify's own player and Spotify's privacy policy applies to it; we never see your Spotify account.</p>
+        <p>Accounts, data and uploads are stored with Supabase. Discover photos are loaded from Openverse, Flickr or Unsplash, which see your IP address when your browser fetches them, as any website does. If you open the music player, it is Spotify's own player and Spotify's privacy policy applies to it; we never see your Spotify account. If you choose “connect Spotify”, the sign-in Spotify gives you is kept in your browser and only ever sent to Spotify, and you can disconnect at any time.</p>
         <h3>Your choices</h3>
         <p>You can delete any post, and you can delete your whole account from your profile — that erases your profile, posts, hearts, collections and follows. To ask for a copy of your data or anything else, write to <Contact />.</p>
       </>

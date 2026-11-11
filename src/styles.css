@@ -217,6 +217,14 @@ select, textarea { font: inherit; color: inherit; background: var(--card); borde
 .music header span { margin-right: auto; }
 .music iframe { display: block; width: 100%; border: 0; }
 .music.small iframe { height: 0; }
+.now { display: flex; align-items: center; gap: 10px; padding: 4px 12px 10px; }
+.now img, .now .art { width: 52px; height: 52px; border-radius: 6px; object-fit: cover; background: var(--chip); flex: none; }
+.now .what { flex: 1; min-width: 0; display: grid; }
+.now .what strong, .now .what small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now .what small { color: var(--muted); }
+.now .buttons { display: flex; gap: 4px; }
+.now .buttons button { width: 32px; height: 32px; padding: 0; border-radius: 50%; }
+.music-controls .primary { justify-self: start; }
 .music-controls { display: grid; gap: 6px; padding: 10px 12px 12px; }
 .music-controls .link { justify-self: start; text-decoration: underline; font-size: 12px; }
 
