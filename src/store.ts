@@ -34,6 +34,7 @@ export const supabase = url && anon ? createClient(url, anon) : null
 type State = {
   ready: boolean
   me: Profile | null
+  isAdmin: boolean
   hearted: Record<string, string> // image key -> image id
   counts: Record<string, number> // heart counts changed this session
   following: string[] // profile ids
@@ -45,7 +46,7 @@ type State = {
 
 const savedTheme = (() => { try { return localStorage.getItem('heartcore:theme') as Theme | null } catch { return null } })()
 let state: State = {
-  ready: !supabase, me: null, hearted: {}, counts: {}, following: [],
+  ready: !supabase, me: null, isAdmin: false, hearted: {}, counts: {}, following: [],
   theme: savedTheme ?? 'pastel', authOpen: false, toast: '', rev: 0,
 }
 const listeners = new Set<() => void>()
@@ -76,10 +77,11 @@ export function toImg(r: any, via?: string): Img {
 
 async function loadMe(userId: string) {
   if (!supabase) return
-  const [profile, hearts, follows] = await Promise.all([
+  const [profile, hearts, follows, admin] = await Promise.all([
     supabase.from('profiles').select('id, username, bio').eq('id', userId).maybeSingle(),
     supabase.from('hearts').select('image_id, images(provider, provider_id)').eq('user_id', userId),
     supabase.from('follows').select('following_id').eq('follower_id', userId),
+    supabase.rpc('is_admin'),
   ])
   if (profile.error || !profile.data) {
     toast('could not load your profile — has the database schema been run?')
@@ -90,7 +92,7 @@ async function loadMe(userId: string) {
     const i = h.images
     if (i) hearted[i.provider === 'upload' ? h.image_id : `${i.provider}:${i.provider_id}`] = h.image_id
   }
-  set({ ready: true, me: profile.data, hearted, following: (follows.data ?? []).map((f: any) => f.following_id) })
+  set({ ready: true, me: profile.data, isAdmin: admin.data === true, hearted, following: (follows.data ?? []).map((f: any) => f.following_id) })
 }
 
 export function initAuth() {
@@ -100,7 +102,7 @@ export function initAuth() {
     if (userId === current) return
     current = userId
     if (userId) loadMe(userId)
-    else set({ ready: true, me: null, hearted: {}, following: [] })
+    else set({ ready: true, me: null, isAdmin: false, hearted: {}, following: [] })
   }
   supabase.auth.getSession().then(({ data }) => apply(data.session?.user.id ?? null))
   // Defer: Supabase calls made directly inside this callback can deadlock.

@@ -164,9 +164,48 @@ function SaveToCollection({ img }: { img: Img }) {
   )
 }
 
+function ReportForm({ img, onDone }: { img: Img; onDone: () => void }) {
+  const { me } = useStore()
+  const [reason, setReason] = useState('')
+  const [details, setDetails] = useState('')
+  const [contact, setContact] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!supabase) return toast('reporting is not switched on for this copy of heartcore')
+    setBusy(true)
+    try {
+      await api.fileReport(img, reason, details.trim(), contact.trim(), me?.id)
+      toast('thank you — your report was sent and will be reviewed')
+      onDone()
+    } catch (err) { console.error(err); toast('could not send that report — try again'); setBusy(false) }
+  }
+  return (
+    <form className="report" onSubmit={submit}>
+      <h4>report this image</h4>
+      <select value={reason} onChange={(e) => setReason(e.target.value)} required aria-label="Reason">
+        <option value="" disabled>what's wrong with it?</option>
+        {api.REASONS.map(([v, label]) => <option key={v} value={v}>{label}</option>)}
+      </select>
+      <textarea value={details} onChange={(e) => setDetails(e.target.value)} maxLength={2000} rows={3} aria-label="Details"
+        placeholder={reason === 'copyright' ? 'where can we see your original? (link)' : 'anything we should know? (optional)'}
+        required={reason === 'copyright'} />
+      {(!me || reason === 'copyright') && (
+        <input type="email" value={contact} onChange={(e) => setContact(e.target.value)} maxLength={200}
+          placeholder={reason === 'copyright' ? 'your email' : 'your email (optional)'} aria-label="Your email" required={reason === 'copyright'} />
+      )}
+      <div className="inline-form">
+        <button type="submit" className="primary" disabled={busy}>{busy ? 'sending…' : 'send report'}</button>
+        <button type="button" onClick={onDone}>cancel</button>
+      </div>
+    </form>
+  )
+}
+
 export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
   const { me, hearted } = useStore()
   const [burst, setBurst] = useState(0)
+  const [reporting, setReporting] = useState(false)
   const love = () => {
     if (!hearted[img.key]) actions.toggleHeart(img)
     if (me) setBurst((b) => b + 1)
@@ -205,6 +244,9 @@ export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
           <HeartButton img={img} big />
           <SaveToCollection img={img} />
           {mine && <button className="danger" onClick={remove}>delete post</button>}
+          {reporting
+            ? <ReportForm img={img} onDone={() => setReporting(false)} />
+            : !mine && <button className="danger report-link" onClick={() => setReporting(true)}>report</button>}
         </aside>
       </div>
     </Modal>
@@ -303,6 +345,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         <label>tags
           <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="grunge, pastel, summer" />
         </label>
+        <p className="muted small">Only post things you made or have permission to share, and nothing that breaks the <a className="underline" href="#/about/rules" target="_blank" rel="noreferrer">rules</a>.</p>
         {error && <p className="error" role="alert">{error}</p>}
         <button className="primary" type="submit" disabled={busy}>{busy ? 'posting…' : 'post it ♥'}</button>
       </form>
@@ -369,6 +412,12 @@ export function AuthModal() {
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
             autoComplete={mode === 'up' ? 'new-password' : 'current-password'} required />
         </label>
+        {mode === 'up' && (
+          <label className="check">
+            <input type="checkbox" required />
+            <span>I'm 13 or older and I agree to the <a className="underline" href="#/about/terms" target="_blank" rel="noreferrer">terms</a>, <a className="underline" href="#/about/rules" target="_blank" rel="noreferrer">rules</a> and <a className="underline" href="#/about/privacy" target="_blank" rel="noreferrer">privacy policy</a></span>
+          </label>
+        )}
         {error && <p className="error" role="alert">{error}</p>}
         <button className="primary" type="submit" disabled={busy}>{busy ? 'one sec…' : mode === 'up' ? 'create my account' : 'sign in'}</button>
         <button type="button" className="danger" onClick={() => { setMode(mode === 'up' ? 'in' : 'up'); setError('') }}>

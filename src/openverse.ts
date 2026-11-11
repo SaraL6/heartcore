@@ -14,7 +14,11 @@ type OvImage = {
 
 export async function searchImages(q: string, page: number): Promise<{ items: Img[]; hasMore: boolean }> {
   const u = new URL(API)
-  u.search = new URLSearchParams({ q, page: String(page), page_size: String(PAGE_SIZE), source: 'flickr' }).toString()
+  const params: Record<string, string> = { q, page: String(page), page_size: String(PAGE_SIZE), source: 'flickr' }
+  // If the site ever earns money (ads, paid features), set this so Discover
+  // leaves out photos whose license forbids commercial use.
+  if (import.meta.env.VITE_COMMERCIAL_LICENSES_ONLY === 'true') params.license_type = 'commercial'
+  u.search = new URLSearchParams(params).toString()
   // The library can be slow and times out now and then; one quiet retry usually does it.
   const attempt = () => fetch(u, { signal: AbortSignal.timeout(30_000) }).catch(() => null)
   let res = await attempt()

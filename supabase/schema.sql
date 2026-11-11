@@ -200,3 +200,98 @@ create policy "upload to own folder" on storage.objects for insert to authentica
 drop policy if exists "delete own uploads" on storage.objects;
 create policy "delete own uploads" on storage.objects for delete to authenticated
   using (bucket_id = 'images' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------- moderation, reports and account deletion ----------
+
+-- A removed picture stays in the table (so it can't simply be re-added) but
+-- is hidden from everyone on the site.
+alter table public.images add column if not exists removed boolean not null default false;
+
+-- Admins are added by hand in the SQL editor, never from the site:
+--   insert into public.admins select id from public.profiles where username = 'yourname';
+create table if not exists public.admins (
+  user_id uuid primary key references public.profiles on delete cascade
+);
+alter table public.admins enable row level security; -- no policies: not readable or writable from the site
+
+create or replace function public.is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.admins where user_id = auth.uid())
+$$;
+
+drop policy if exists "read images" on public.images;
+create policy "read images" on public.images for select using (not removed);
+
+-- Anyone, signed in or not, can report a picture (copyright owners usually aren't members).
+create table if not exists public.reports (
+  id uuid primary key default gen_random_uuid(),
+  image_id uuid references public.images on delete set null,
+  provider text,
+  provider_id text,
+  url text not null check (url ~ '^https?://' and char_length(url) <= 1000),
+  reason text not null check (reason in ('copyright', 'nudity', 'minor', 'harassment', 'violence', 'spam', 'other')),
+  details text not null default '' check (char_length(details) <= 2000),
+  contact text check (contact is null or char_length(contact) <= 200),
+  reporter_id uuid references public.profiles on delete set null,
+  status text not null default 'open' check (status in ('open', 'removed', 'dismissed')),
+  created_at timestamptz not null default now()
+);
+create index if not exists reports_open_idx on public.reports (created_at) where status = 'open';
+alter table public.reports enable row level security;
+
+drop policy if exists "file a report" on public.reports;
+create policy "file a report" on public.reports for insert to anon, authenticated
+  with check (status = 'open' and (reporter_id is null or reporter_id = auth.uid()));
+drop policy if exists "admins read reports" on public.reports;
+create policy "admins read reports" on public.reports for select to authenticated using (public.is_admin());
+revoke update, delete on public.reports from anon, authenticated;
+
+-- Close a report, optionally taking the picture down everywhere on the site.
+create or replace function public.admin_resolve_report(p_report uuid, p_remove boolean) returns void
+language plpgsql security definer set search_path = public as $$
+declare r public.reports;
+begin
+  if not public.is_admin() then raise exception 'admins only'; end if;
+  select * into r from public.reports where id = p_report;
+  if not found then raise exception 'no such report'; end if;
+  if not p_remove then
+    update public.reports set status = 'dismissed' where id = p_report;
+    return;
+  end if;
+  if r.image_id is not null then
+    update public.images set removed = true where id = r.image_id;
+  elsif r.provider is not null and r.provider_id is not null then
+    insert into public.images (provider, provider_id, url, removed) values (r.provider, r.provider_id, r.url, true)
+    on conflict (provider, provider_id) do update set removed = true;
+  end if;
+  update public.reports set status = 'removed'
+  where status = 'open' and (id = p_report or image_id = r.image_id
+    or (provider = r.provider and provider_id = r.provider_id));
+end $$;
+revoke execute on function public.admin_resolve_report from public, anon;
+grant execute on function public.admin_resolve_report to authenticated;
+
+-- For pictures from the outside library: which ones do we already know, how
+-- many hearts do they have, and has any been taken down here?
+create or replace function public.external_status(p_provider text, p_ids text[])
+returns table (provider_id text, id uuid, heart_count int, removed boolean)
+language sql stable security definer set search_path = public as $$
+  select i.provider_id, i.id, i.heart_count, i.removed
+  from public.images i where i.provider = p_provider and i.provider_id = any (p_ids)
+$$;
+grant execute on function public.external_status to anon, authenticated;
+
+-- Let a member erase their account and everything attached to it.
+create or replace function public.delete_my_account() returns void
+language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'sign in first'; end if;
+  delete from public.images where uploader_id = auth.uid();
+  delete from auth.users where id = auth.uid();
+end $$;
+revoke execute on function public.delete_my_account from public, anon;
+grant execute on function public.delete_my_account to authenticated;
+
+drop policy if exists "admins delete uploads" on storage.objects;
+create policy "admins delete uploads" on storage.objects for delete to authenticated
+  using (bucket_id = 'images' and public.is_admin());

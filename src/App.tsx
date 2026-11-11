@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import * as api from './api'
 import { AuthModal, FollowButton, Grid, HeartIcon, Media, PostModal, UploadModal, useLoad } from './components'
+import { LEGAL_LINKS, LegalPage } from './legal'
 import { searchImages } from './openverse'
 import { actions, initAuth, requireMe, supabase, toast, useStore, type Collection, type Img, type Profile, type Theme } from './store'
 
@@ -38,11 +39,13 @@ export default function App() {
   let page: React.ReactNode
   if (section === 'friends') page = <Friends tab={arg} onOpen={setOpen} />
   else if (section === 'u') page = <ProfilePage key={arg} username={arg} tab={sub} onOpen={setOpen} />
+  else if (section === 'about') page = <LegalPage page={arg} />
+  else if (section === 'admin') page = <AdminPage />
   else if (section === 'c') page = <CollectionPage key={arg} id={arg} onOpen={setOpen} />
   else page = <Discover key={`${section}/${arg}`} q={section === 'tag' || section === 'search' ? arg : ''} isTag={section === 'tag'} onOpen={setOpen} />
 
   const meHref = s.me ? `#/u/${s.me.username}` : undefined
-  const current = section === 'friends' ? 'friends' : section === 'u' && arg === s.me?.username ? 'me' : section === 'u' || section === 'c' ? '' : 'discover'
+  const current = section === 'friends' ? 'friends' : section === 'u' && arg === s.me?.username ? 'me' : ['u', 'c', 'about', 'admin'].includes(section) ? '' : 'discover'
 
   return (
     <>
@@ -72,6 +75,10 @@ export default function App() {
       <main>{page}</main>
       <footer className="foot">
         made with ♥ for the tumblr kids · photos from <a href="https://openverse.org" target="_blank" rel="noreferrer noopener">Openverse</a>, shared by their creators under Creative Commons licenses
+        <nav>
+          {LEGAL_LINKS.map(([path, label]) => <a key={path} href={`#/about/${path}`}>{label}</a>)}
+          {s.isAdmin && <a href="#/admin">moderation</a>}
+        </nav>
       </footer>
       {open && <PostModal img={open} onClose={() => setOpen(null)} />}
       {uploading && <UploadModal onClose={() => setUploading(false)} />}
@@ -128,6 +135,8 @@ function Discover({ q, isTag, onOpen }: { q: string; isTag: boolean; onOpen: Ope
       // Fill in hearts from people here before showing the batch.
       const known = await api.lookupExternal(res.items).catch(() => [])
       const ids = new Map(known.map((k) => [k.key, k.id]))
+      const gone = new Set(known.filter((k) => k.removed).map((k) => k.key)) // taken down here
+      res.items = res.items.filter((i) => !gone.has(i.key))
       res.items.forEach((i) => { i.id = ids.get(i.key) })
       actions.noteCounts(known)
       setItems((old) => {
@@ -255,6 +264,11 @@ function ProfilePage({ username, tab, onOpen }: { username: string; tab: string;
     try { await api.updateBio(profile.id, bio); profile.bio = bio; actions.setMe({ ...me!, bio }) } catch (e) { console.error(e); toast('could not save your bio') }
   }
 
+  const eraseAccount = async () => {
+    if (prompt('This permanently erases your profile, posts, hearts, collections and follows.\nType your username to confirm:') !== profile.username) return
+    try { await api.deleteAccount(profile.id); location.hash = '#/'; toast('your account has been deleted') } catch (e) { console.error(e); toast('could not delete your account — try again') }
+  }
+
   return (
     <>
       <header className="profile">
@@ -265,7 +279,12 @@ function ProfilePage({ username, tab, onOpen }: { username: string; tab: string;
               onChange={(e) => setBio(e.target.value)} onBlur={saveBio} onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} />
           : profile.bio && <p className="bio">{profile.bio}</p>}
         <p className="stats"><span><b>{followers}</b> followers</span><span><b>{followingCount}</b> following</span></p>
-        {mine ? <button className="danger" onClick={() => { actions.signOut(); location.hash = '#/' }}>sign out</button> : <FollowButton profileId={profile.id} />}
+        {mine ? (
+          <p className="account-links">
+            <button className="danger" onClick={() => { actions.signOut(); location.hash = '#/' }}>sign out</button>
+            <button className="danger" onClick={eraseAccount}>delete my account</button>
+          </p>
+        ) : <FollowButton profileId={profile.id} />}
       </header>
       <Tabs base={`#/u/${profile.username}`} tabs={[['', 'hearts'], ['posts', 'posts'], ['collections', 'collections']]} current={tab} />
       {tab === 'collections' ? <CollectionList key={rev} profile={profile} mine={mine} />
@@ -336,6 +355,44 @@ function CollectionPage({ id, onOpen }: { id: string; onOpen: Open }) {
         <span>by <a className="underline" href={`#/u/${c.owner}/collections`}>{c.owner}</a>{mine && <> · <button className="danger" onClick={remove}>delete collection</button></>}</span>
       </PageTitle>
       <Grid images={c.images} onOpen={onOpen} empty="empty for now — open any image and save it here." />
+    </>
+  )
+}
+
+// ---------- moderation (admins only) ----------
+
+function AdminPage() {
+  const { isAdmin, ready } = useStore()
+  const [n, setN] = useState(0)
+  const { data, loading, error } = useLoad(() => (isAdmin ? api.openReports() : Promise.resolve([])), [isAdmin, n])
+  if (!ready) return <Status loading />
+  if (!isAdmin) return <p className="empty">this page is for the site's moderators.</p>
+  const resolve = async (r: api.Report, remove: boolean) => {
+    if (remove && !confirm('Take this image down for everyone?')) return
+    try { await api.resolveReport(r, remove); setN(n + 1) } catch (e) { console.error(e); toast('that did not work — try again') }
+  }
+  const label = (reason: string) => api.REASONS.find(([v]) => v === reason)?.[1] ?? reason
+  return (
+    <>
+      <PageTitle title="reports" sub={data ? `${data.length} open` : undefined} />
+      {!data ? <Status loading={loading} error={error} /> : !data.length ? <p className="empty">nothing to review ♡</p> : (
+        <ul className="reports">
+          {data.map((r) => (
+            <li key={r.id}>
+              <a href={r.url} target="_blank" rel="noreferrer noopener"><img src={r.url} alt="reported" loading="lazy" /></a>
+              <div>
+                <strong>{label(r.reason)}</strong>
+                {r.details && <p>{r.details}</p>}
+                <small>{new Date(r.created_at).toLocaleString()}{r.contact && <> · <a className="underline" href={`mailto:${r.contact}`}>{r.contact}</a></>}</small>
+                <div className="inline-form">
+                  <button className="primary" onClick={() => resolve(r, true)}>take it down</button>
+                  <button onClick={() => resolve(r, false)}>dismiss</button>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   )
 }

@@ -13,13 +13,14 @@ const db = () => {
 }
 const dedupe = (imgs: Img[]) => [...new Map(imgs.map((i) => [i.key, i])).values()]
 
-/** For library search results: find the ones people here have already hearted. */
+/** For library search results: hearts from people here, and anything taken down here. */
 export async function lookupExternal(items: Img[]) {
-  const ids = items.filter((i) => !i.id && i.providerId).map((i) => i.providerId!)
+  const ids = items.filter((i) => i.providerId).map((i) => i.providerId!)
   if (!supabase || !ids.length) return []
-  const { data } = await supabase.from('images').select('id, provider_id, heart_count')
-    .eq('provider', items[0].provider).in('provider_id', ids)
-  return (data ?? []).map((r: any) => ({ key: `${items[0].provider}:${r.provider_id}`, id: r.id as string, heartCount: r.heart_count as number }))
+  const { data } = await supabase.rpc('external_status', { p_provider: items[0].provider, p_ids: ids })
+  return ((data ?? []) as any[]).map((r) => ({
+    key: `${items[0].provider}:${r.provider_id}`, id: r.id as string, heartCount: r.heart_count as number, removed: !!r.removed,
+  }))
 }
 
 export async function friendsFeed(following: string[]): Promise<Img[]> {
@@ -139,11 +140,52 @@ export async function deletePost(img: Img) {
 export async function signUp(email: string, password: string, username: string) {
   const taken = ok(await db().from('profiles').select('id').eq('username', username).maybeSingle())
   if (taken) throw new Error('that username is taken — try another')
-  const { data, error } = await db().auth.signUp({ email, password, options: { data: { username } } })
+  const { data, error } = await db().auth.signUp({
+    email, password, options: { data: { username, accepted_terms_at: new Date().toISOString() } },
+  })
   if (error) throw error
   return { needsEmailConfirm: !data.session }
 }
 export async function signIn(email: string, password: string) {
   const { error } = await db().auth.signInWithPassword({ email, password })
   if (error) throw error
+}
+
+// ---------- reports and moderation ----------
+
+export const REASONS: [string, string][] = [
+  ['copyright', "it's mine and was posted without permission"],
+  ['nudity', 'nudity or sexual content'],
+  ['minor', 'it sexualises or endangers a child'],
+  ['harassment', 'harassment, hate or a private person'],
+  ['violence', 'violence or self-harm'],
+  ['spam', 'spam or scam'],
+  ['other', 'something else'],
+]
+
+export async function fileReport(img: Img, reason: string, details: string, contact: string, reporterId?: string) {
+  ok(await db().from('reports').insert({
+    image_id: img.id ?? null, provider: img.provider, provider_id: img.providerId ?? null, url: img.url,
+    reason, details, contact: contact || null, reporter_id: reporterId ?? null,
+  }))
+}
+
+export type Report = { id: string; url: string; reason: string; details: string; contact: string | null; created_at: string; provider: string | null }
+export async function openReports(): Promise<Report[]> {
+  return ok(await db().from('reports').select('id, url, reason, details, contact, created_at, provider')
+    .eq('status', 'open').order('created_at').limit(100)) as Report[]
+}
+export async function resolveReport(r: Report, remove: boolean) {
+  ok(await db().rpc('admin_resolve_report', { p_report: r.id, p_remove: remove }))
+  const marker = `/object/public/${BUCKET}/`
+  const at = r.url.indexOf(marker)
+  if (remove && at >= 0) await db().storage.from(BUCKET).remove([decodeURIComponent(r.url.slice(at + marker.length))])
+}
+
+export async function deleteAccount(userId: string) {
+  // Remove the uploaded files first; the database function erases everything else.
+  const { data } = await db().storage.from(BUCKET).list(userId, { limit: 1000 })
+  if (data?.length) await db().storage.from(BUCKET).remove(data.map((f) => `${userId}/${f.name}`))
+  ok(await db().rpc('delete_my_account'))
+  await db().auth.signOut()
 }
