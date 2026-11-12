@@ -1,3 +1,4 @@
+import { looksAiByWords } from './aicheck'
 import { flickrEnabled, searchFlickr } from './flickr'
 import { searchOpenverse } from './openverse'
 import type { Img } from './store'
@@ -69,7 +70,8 @@ function remembered(name: string, search: Search): Search {
     const key = `${name}|${q.toLowerCase()}|${page}`
     const hit = recent.get(key)
     if (hit && Date.now() - hit.at < KEEP_MS) return hit.page.then(copy)
-    const p = search(q, page)
+    // Library photos that describe themselves as AI never reach the page.
+    const p = search(q, page).then((r) => ({ hasMore: r.hasMore, items: r.items.filter((i) => !looksAiByWords(i)) }))
     recent.set(key, { at: Date.now(), page: p })
     p.catch(() => recent.delete(key))
     if (recent.size > 80) recent.delete(recent.keys().next().value!)

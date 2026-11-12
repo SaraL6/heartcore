@@ -196,7 +196,7 @@ export async function createPost(userId: string, input: {
   }
   const row = ok(await db().from('images').insert({
     url, width: input.width ?? null, height: input.height ?? null,
-    caption: input.caption, tags: input.tags, uploader_id: userId, provider: 'upload',
+    caption: input.caption, tags: input.tags, uploader_id: userId, provider: 'upload', human_made: true,
   }).select('id').single()) as any
   // Posting something counts as hearting it, so it shows up for your followers.
   await db().from('hearts').insert({ user_id: userId, image_id: row.id })
@@ -242,7 +242,7 @@ export const REASONS: [string, string][] = [
   ['minor', 'it sexualises or endangers a child'],
   ['harassment', 'harassment, hate or a private person'],
   ['violence', 'violence or self-harm'],
-  ['ai', "it's AI-generated"],
+  ['ai', "it's AI-made, AI-edited or manipulated"],
   ['spam', 'spam or scam'],
   ['other', 'something else'],
 ]

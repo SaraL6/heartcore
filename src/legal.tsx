@@ -14,13 +14,14 @@ const PAGES: Record<string, { title: string; body: React.ReactNode }> = {
         <p>heartcore is for collecting pretty, cozy, inspiring things. To keep it that way:</p>
         <ul>
           <li><b>Only post what you may share.</b> Your own photos and art, or things you have permission to post. Credit the creator when you know who it is.</li>
-          <li><b>Made by humans.</b> No AI-generated images. This is a place for real photos, real art and real moments.</li>
+          <li><b>Made by humans, not machines.</b> No AI-generated images, and no images edited with AI: no generative fill, AI filters or upscalers, face swaps or deepfakes. No composites or manipulated photos passed off as real either. Ordinary editing is fine: cropping, light and colour, black and white, film looks. This is a place for real photos, real art and real moments.</li>
           <li><b>No nudity or sexual content.</b> None at all involving anyone under 18 — that is reported to the authorities and the account is banned.</li>
           <li><b>No harassment or hate,</b> and no photos of private people posted to mock, expose or target them.</li>
           <li><b>No graphic violence</b> and nothing that promotes self-harm or eating disorders.</li>
           <li><b>No spam,</b> scams or ads.</li>
           <li><b>You must be 13 or older</b> (or the minimum age for online services in your country, if higher).</li>
         </ul>
+        <p>Uploads whose files show they were made or edited with AI are refused automatically. Everything else relies on you: if you spot an AI or manipulated image, report it. We take them down, and close accounts that keep posting them.</p>
         <p>See something that breaks these? Open the image and press <b>report</b>. We review reports and remove what breaks the rules; accounts that keep breaking them are closed.</p>
       </>
     ),

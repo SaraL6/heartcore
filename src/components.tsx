@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from './api'
+import { checkImageFile } from './aicheck'
 import { Notes } from './profile'
 import { actions, fmt, heartCount, requireMe, supabase, toast, useStore, type Img } from './store'
 
@@ -321,6 +322,8 @@ async function prepare(file: File): Promise<{ blob: Blob; width: number; height:
   return blob ? { blob, width: c.width, height: c.height } : { blob: file, width: bmp.width, height: bmp.height }
 }
 
+const aiRefusal = (marker: string) => `this image's file shows it was made or edited with AI (${marker}). heartcore is for human-made images only.`
+
 const OK_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
 export function UploadModal({ onClose }: { onClose: () => void }) {
@@ -338,6 +341,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<'image' | 'words'>('image')
   const [words, setWords] = useState('')
   const [style, setStyle] = useState<string>('ink')
+  const [human, setHuman] = useState(false)
 
   useEffect(() => {
     if (!file) { setPreview(url.trim()); return }
@@ -346,10 +350,13 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
     return () => URL.revokeObjectURL(u)
   }, [file, url])
 
-  const choose = (f?: File | null) => {
+  const choose = async (f?: File | null) => {
     if (!f) return
     if (!OK_TYPES.includes(f.type)) return setError('please pick a jpg, png, gif or webp image')
     if (f.size > 15_000_000) return setError('that image is over 15 MB — try a smaller one')
+    // Before resizing, which would wipe the file's own record of how it was made.
+    const marker = await checkImageFile(f).catch(() => null)
+    if (marker) { setFile(null); return setError(aiRefusal(marker)) }
     setError(''); setUrl(''); setFile(f)
   }
 
@@ -367,6 +374,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
       } catch (err) { console.error(err); setError(`could not post that: ${errorText(err)}`); setBusy(false) }
       return
     }
+    if (!human) return setError('please confirm the image is yours to share and not AI-made or AI-edited')
     if (!file && !/^https:\/\//i.test(src)) return setError('pick an image or paste a link starting with https://')
     setBusy(true)
     try {
@@ -375,6 +383,10 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         const p = await prepare(file)
         await api.createPost(me.id, { ...common, file: p.blob, width: p.width, height: p.height })
       } else {
+        // Check the linked file too, when its host lets us read it.
+        const linked = await fetch(src, { signal: AbortSignal.timeout(8000) }).then((r) => (r.ok ? r.blob() : null)).catch(() => null)
+        const marker = linked && await checkImageFile(linked).catch(() => null)
+        if (marker) { setBusy(false); return setError(aiRefusal(marker)) }
         const el = previewEl.current
         await api.createPost(me.id, { ...common, src, width: el?.naturalWidth || undefined, height: el?.naturalHeight || undefined })
       }
@@ -433,7 +445,13 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         <label>tags
           <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="grunge, pastel, summer" />
         </label>
-        <p className="muted small">Only post things you made or have permission to share — no AI-generated images, and credit words that aren't yours — and nothing that breaks the <a className="underline" href="#/about/rules" target="_blank" rel="noreferrer">rules</a>.</p>
+        {mode === 'image' && (
+          <label className="check">
+            <input type="checkbox" checked={human} onChange={(e) => setHuman(e.target.checked)} />
+            <span>I took or made this (or have permission to share it), and it isn't AI-generated, AI-edited or manipulated to look real.</span>
+          </label>
+        )}
+        <p className="muted small">heartcore is human-made only. AI images are refused when their file gives them away and removed when reported. Credit words that aren't yours, and see the <a className="underline" href="#/about/rules" target="_blank" rel="noreferrer">rules</a>.</p>
         {error && <p className="error" role="alert">{error}</p>}
         <button className="primary" type="submit" disabled={busy}>{busy ? 'posting…' : 'post it ♥'}</button>
       </form>

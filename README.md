@@ -1,6 +1,6 @@
 # heartcore ♥
 
-[![CI](https://github.com/SaraL6/weheartit-clone/actions/workflows/ci.yml/badge.svg)](https://github.com/SaraL6/weheartit-clone/actions/workflows/ci.yml)
+[![CI](https://github.com/SaraL6/heartcore/actions/workflows/ci.yml/badge.svg)](https://github.com/SaraL6/heartcore/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-ff5c8a.svg)](LICENSE)
 
 **An ad-free place to heart and collect images, built for everyone who misses the Tumblr era.**
@@ -38,8 +38,11 @@ and take everything with you whenever you want.
   Spotify for full songs, and put a playlist on your profile for visitors to play
 - **Take it with you** — "download everything" saves your hearts, posts and
   collections as one web page, so they can never vanish
-- **Human-made only** — no AI-generated images; no ads; no tracking; heart
-  counts can be hidden
+- **Human-made only** — no AI-generated or AI-edited images. Uploads whose
+  files carry AI fingerprints are refused, posting requires confirming the
+  image is human-made, and library photos that describe themselves as AI are
+  filtered out
+- **No ads, no tracking** — and heart counts can be hidden
 - **Safety built in** — report button on every image, a moderation queue,
   takedowns, rules and privacy pages, account deletion
 
@@ -70,6 +73,12 @@ Supabase, so the database itself has to enforce who can do what.
 - **One image model, several sources.** Library photos and member uploads
   share one shape, and a library photo is only written to the database the
   first time someone hearts or saves it. Image sources are swappable modules.
+- **Human-made, checked in layers.** Before an upload is resized (which
+  would wipe its metadata), the browser scans the file for the marks AI tools
+  leave: the IPTC/C2PA "trained algorithmic media" source type, generator
+  names, Stable Diffusion's PNG settings. The database refuses picture posts
+  without the poster's human-made confirmation. Neither can catch an image
+  whose metadata was stripped, so reports and takedowns are the backstop.
 - **Untrusted input is treated as untrusted.** Spotify links are reduced to a
   validated `type/id` before a player is ever created, the exported page
   escapes every caption, and uploads are resized in the browser.
@@ -84,6 +93,7 @@ Supabase, so the database itself has to enforce who can do what.
 | `src/music.tsx`, `src/spotify.ts` | The music player, and Spotify sign-in (PKCE) with in-page full-song playback. |
 | `src/profile.tsx` | Profile extras: mood, colour, top 8, guestbook, visit counter. |
 | `src/App.tsx`, `src/components.tsx` | Pages and building blocks. |
+| `src/aicheck.ts` | Spotting AI images: file fingerprints and self-described library photos. |
 | `src/legal.tsx` | Rules, terms, privacy and copyright pages. |
 | `supabase/schema.sql` | Tables, access rules, triggers, storage, reports and moderation. |
 | `supabase/tests/` | Access-rule tests and the stand-ins needed to run them on plain Postgres. |
