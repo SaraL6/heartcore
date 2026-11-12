@@ -290,6 +290,17 @@ export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
   const { me, hearted } = s
   const [burst, setBurst] = useState(0)
   const [reporting, setReporting] = useState(false)
+  const [shared, setShared] = useState('')
+  const share = async () => {
+    // A library picture gets a place on heartcore the first time it's hearted, saved or shared.
+    if (!img.id && !requireMe()) return
+    try {
+      const link = await api.shareLink(img)
+      if (!(await copyText(link))) { window.prompt('copy this link', link); return }
+      setShared('link copied ✓')
+      setTimeout(() => setShared(''), 2500)
+    } catch (e) { console.error(e); toast('could not make a link for this — try again') }
+  }
   const love = () => {
     if (!hearted[img.key]) actions.toggleHeart(img)
     if (me) setBurst((b) => b + 1)
@@ -330,7 +341,10 @@ export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
               {img.tags.map((t) => <a key={t} href={`#/tag/${encodeURIComponent(t)}`} onClick={onClose}>#{t}</a>)}
             </div>
           )}
-          <HeartButton img={img} big />
+          <div className="post-actions">
+            <HeartButton img={img} big />
+            <button className="share" onClick={share}>{shared || 'share'}</button>
+          </div>
           {img.id && <Notes imageId={img.id} total={heartCount(s, img)} onNavigate={onClose} />}
           <SaveToCollection img={img} />
           {me && img.kind !== 'text' && (
@@ -499,7 +513,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
 }
 
 export function AuthModal() {
-  const [mode, setMode] = useState<'in' | 'up'>('up')
+  const [mode, setMode] = useState<'in' | 'up' | 'forgot'>('up')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [username, setUsername] = useState('')
@@ -524,6 +538,17 @@ export function AuthModal() {
     e.preventDefault()
     setError('')
     const name = username.trim().toLowerCase()
+    if (mode === 'forgot') {
+      setBusy(true)
+      try {
+        await api.sendPasswordReset(email.trim())
+        // Same message whether or not the address has an account, so this can't be used to check who's a member.
+        setNotice(`if ${email.trim()} has an account, a link to choose a new password is on its way. check your spam folder too.`)
+        setMode('in')
+      } catch (err) { setError(errorText(err).toLowerCase()) }
+      setBusy(false)
+      return
+    }
     if (mode === 'up' && !/^[a-z0-9_.]{3,24}$/.test(name)) return setError('usernames are 3–24 characters: letters, numbers, dots and underscores')
     if (password.length < 8) return setError('passwords need at least 8 characters')
     setBusy(true)
@@ -541,9 +566,10 @@ export function AuthModal() {
   }
 
   return (
-    <Modal onClose={close} label={mode === 'up' ? 'Join' : 'Sign in'}>
+    <Modal onClose={close} label={mode === 'up' ? 'Join' : mode === 'forgot' ? 'Reset password' : 'Sign in'}>
       <form className="upload" onSubmit={submit}>
-        <h2>{mode === 'up' ? 'join heartcore ♥' : 'welcome back ♥'}</h2>
+        <h2>{mode === 'up' ? 'join heartcore ♥' : mode === 'forgot' ? 'forgot your password?' : 'welcome back ♥'}</h2>
+        {mode === 'forgot' && <p className="muted">Enter your email and we'll send you a link to choose a new one.</p>}
         {notice && <p className="notice" role="status">{notice}</p>}
         {mode === 'up' && (
           <label>username
@@ -553,10 +579,12 @@ export function AuthModal() {
         <label>email
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
         </label>
-        <label>password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-            autoComplete={mode === 'up' ? 'new-password' : 'current-password'} required />
-        </label>
+        {mode !== 'forgot' && (
+          <label>password
+            <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+              autoComplete={mode === 'up' ? 'new-password' : 'current-password'} required />
+          </label>
+        )}
         {mode === 'up' && (
           <label className="check">
             <input type="checkbox" required />
@@ -564,11 +592,60 @@ export function AuthModal() {
           </label>
         )}
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="primary" type="submit" disabled={busy}>{busy ? 'one sec…' : mode === 'up' ? 'create my account' : 'sign in'}</button>
+        <button className="primary" type="submit" disabled={busy}>{busy ? 'one sec…' : mode === 'up' ? 'create my account' : mode === 'forgot' ? 'send me a link' : 'sign in'}</button>
+        {mode === 'in' && <button type="button" className="danger" onClick={() => { setMode('forgot'); setError('') }}>forgot your password?</button>}
         <button type="button" className="danger" onClick={() => { setMode(mode === 'up' ? 'in' : 'up'); setError('') }}>
-          {mode === 'up' ? 'already have an account? sign in' : 'new here? create an account'}
+          {mode === 'up' ? 'already have an account? sign in' : mode === 'forgot' ? 'back to sign in' : 'new here? create an account'}
         </button>
       </form>
     </Modal>
   )
+}
+
+/** Shown after arriving from a password-reset email. */
+export function NewPasswordModal() {
+  const [password, setPassword] = useState('')
+  const [again, setAgain] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (password.length < 8) return setError('passwords need at least 8 characters')
+    if (password !== again) return setError("those two don't match")
+    setBusy(true)
+    try {
+      await api.setNewPassword(password)
+      actions.doneRecovering()
+      toast('your password is changed, and you are signed in ♥')
+    } catch (err) { setError(errorText(err).toLowerCase()); setBusy(false) }
+  }
+  return (
+    <Modal onClose={actions.doneRecovering} label="Choose a new password">
+      <form className="upload" onSubmit={submit}>
+        <h2>choose a new password</h2>
+        <label>new password
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required />
+        </label>
+        <label>and once more
+          <input type="password" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" required />
+        </label>
+        {error && <p className="error" role="alert">{error}</p>}
+        <button className="primary" type="submit" disabled={busy}>{busy ? 'saving…' : 'save my new password'}</button>
+      </form>
+    </Modal>
+  )
+}
+
+/** Copies text, with a fallback for browsers that refuse the clipboard. */
+export async function copyText(text: string): Promise<boolean> {
+  try { await navigator.clipboard.writeText(text); return true } catch { /* fall through */ }
+  const el = document.createElement('textarea')
+  el.value = text
+  el.style.cssText = 'position:fixed;opacity:0'
+  document.body.appendChild(el)
+  el.select()
+  let ok = false
+  try { ok = document.execCommand('copy') } catch { /* nothing more to try */ }
+  el.remove()
+  return ok
 }
