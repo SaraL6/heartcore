@@ -21,7 +21,7 @@ and take everything with you whenever you want.
 
 - **Discover** — endless scroll of real photos with search: new ones from
   Unsplash mixed with old ones from Flickr (or just one, at the flick of a
-  switch), or Openverse when neither is set up, across topics for every kind of curator: streetwear, sneakers,
+  switch), across topics for every kind of curator: streetwear, sneakers,
   cars, architecture, interiors, film photography, tattoos, vinyl and more
 - **Hearts and collections** — heart anything, or hit **save** on any image
   to drop it straight into a collection, Pinterest-style
@@ -80,7 +80,7 @@ Supabase, so the database itself has to enforce who can do what.
 | --- | --- |
 | `src/store.ts` | Signed-in state: who you are, what you've hearted, who you follow. |
 | `src/api.ts` | Every other database read and write, and the export. |
-| `src/images.ts`, `src/unsplash.ts`, `src/flickr.ts`, `src/openverse.ts` | Image search: mixes Unsplash and Flickr when both keys are set, otherwise whichever is set, otherwise Openverse. |
+| `src/images.ts`, `src/unsplash.ts`, `src/flickr.ts`, `src/openverse.ts` | Image search: new photos from Unsplash mixed with old Flickr photos, directly with a Flickr key or through Openverse without one. |
 | `src/music.tsx`, `src/spotify.ts` | The music player, and Spotify sign-in (PKCE) with in-page full-song playback. |
 | `src/profile.tsx` | Profile extras: mood, colour, top 8, guestbook, visit counter. |
 | `src/App.tsx`, `src/components.tsx` | Pages and building blocks. |
@@ -128,16 +128,19 @@ Good to know:
 - The anon key is safe to ship in the site. Never put the `service_role` key
   in `.env.local` or anywhere in this repo.
 
-## Old photos from Flickr (optional)
+## Old photos from Flickr
 
-1. Sign in at [flickr.com](https://www.flickr.com), open
-   [the App Garden](https://www.flickr.com/services/apps/create/apply/) and
-   apply for a **non-commercial** key.
-2. Set the **Key** (never the secret) as `VITE_FLICKR_API_KEY`, then redeploy.
+Discover's "old photos" are Flickr's openly licensed photos. Out of the box
+they come through [Openverse](https://openverse.org), which needs no key but
+can be slow, so the mixed feed shows new photos first and adds old ones as
+they arrive.
 
-Discover then mixes in Flickr photos uploaded before 2016, and only ones whose
-owners chose an open license or that have no known copyright restrictions. The
-footer carries the notice Flickr's API terms ask for.
+If you have Flickr Pro, you can search Flickr directly instead, which is
+faster and limited to uploads from before 2016: create a **non-commercial**
+key in [the App Garden](https://www.flickr.com/services/apps/create/apply/)
+and set its **Key** (never the secret) as `VITE_FLICKR_API_KEY`. Flickr only
+issues API keys to Pro members. Either way, only photos whose owners chose an
+open license, or that have no known copyright restrictions, are shown.
 
 ## Full songs with Spotify (optional)
 

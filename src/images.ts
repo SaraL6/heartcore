@@ -3,19 +3,23 @@ import { searchOpenverse } from './openverse'
 import type { Img } from './store'
 import { searchUnsplash, unsplashEnabled } from './unsplash'
 
-// Where Discover gets its pictures. Unsplash brings new photos, Flickr brings
-// older ones; with both configured, Discover mixes them unless someone picks
-// one. With neither, it uses Openverse (no key needed).
+// Where Discover gets its pictures.
+// - New photos: Unsplash (needs a key).
+// - Old photos: Flickr. Directly with a Flickr API key (Flickr Pro only),
+//   otherwise Flickr's openly licensed photos through Openverse (no key).
+// With Unsplash set up, Discover mixes new and old unless someone picks one.
 export type Source = 'mix' | 'new' | 'old'
-export const canChooseSource = unsplashEnabled && flickrEnabled
+export const canChooseSource = unsplashEnabled
+const searchOld = flickrEnabled ? searchFlickr : searchOpenverse
 
 export const LIBRARIES = [
   ...(unsplashEnabled ? [{ name: 'Unsplash', url: 'https://unsplash.com/?utm_source=heartcore&utm_medium=referral' }] : []),
-  ...(flickrEnabled ? [{ name: 'Flickr', url: 'https://www.flickr.com' }] : []),
-  ...(!unsplashEnabled && !flickrEnabled ? [{ name: 'Openverse', url: 'https://openverse.org' }] : []),
+  flickrEnabled
+    ? { name: 'Flickr', url: 'https://www.flickr.com' }
+    : { name: 'Flickr via Openverse', url: 'https://openverse.org' },
 ]
 
-type Page = { items: Img[]; hasMore: boolean }
+export type Page = { items: Img[]; hasMore: boolean }
 type Search = (q: string, page: number) => Promise<Page>
 
 /** Alternates two lists: one from each side, in turn, until both run out. */
@@ -28,38 +32,55 @@ export function interleave<T>(a: T[], b: T[]): T[] {
   return out
 }
 
-/** Searches two sources at once; one failing doesn't blank the page. */
-export async function mixed(a: Search, b: Search, q: string, page: number): Promise<Page> {
-  const [x, y] = await Promise.allSettled([a(q, page), b(q, page)])
-  if (x.status === 'rejected' && y.status === 'rejected') throw x.reason
-  const none: Page = { items: [], hasMore: false }
-  const left = x.status === 'fulfilled' ? x.value : none
-  const right = y.status === 'fulfilled' ? y.value : none
-  return { items: interleave(left.items, right.items), hasMore: left.hasMore || right.hasMore }
-}
+// How long the mixed feed waits for the slower library before showing what it has.
+export const MIX_WAIT_MS = 2500
+const settle = <T,>(p: Promise<T>) => p.then((value) => ({ ok: true as const, value }), (error) => ({ ok: false as const, error }))
 
-function search(q: string, page: number, source: Source): Promise<Page> {
-  if (!unsplashEnabled && !flickrEnabled) return searchOpenverse(q, page)
-  if (!flickrEnabled) return searchUnsplash(q, page)
-  if (!unsplashEnabled) return searchFlickr(q, page)
-  if (source === 'new') return searchUnsplash(q, page)
-  if (source === 'old') return searchFlickr(q, page)
-  return mixed(searchUnsplash, searchFlickr, q, page)
+/**
+ * Searches two libraries at once and alternates their results. If the second
+ * is slow, the first is shown right away and the second arrives through
+ * `onLate`. One failing never blanks the page.
+ */
+export async function mixed(first: Search, second: Search, q: string, page: number, onLate?: (p: Page) => void, waitMs = MIX_WAIT_MS): Promise<Page> {
+  const a = first(q, page)
+  const b = second(q, page)
+  const late = new Promise<'late'>((r) => setTimeout(() => r('late'), waitMs))
+  const [x, y] = await Promise.all([settle(a), Promise.race([settle(b), late])])
+  if (y === 'late') {
+    if (!x.ok) return b // nothing to show yet; wait for the slow one after all
+    b.then((p) => onLate?.(p), () => {})
+    return { items: x.value.items, hasMore: true }
+  }
+  if (!x.ok && !y.ok) throw x.error
+  const none: Page = { items: [], hasMore: false }
+  const left = x.ok ? x.value : none
+  const right = y.ok ? y.value : none
+  return { items: interleave(left.items, right.items), hasMore: left.hasMore || right.hasMore }
 }
 
 // Going back to a tag you just looked at shouldn't spend another request:
 // Unsplash allows 50 an hour until an app is approved.
-const recent = new Map<string, { at: number; page: Page }>()
+const recent = new Map<string, { at: number; page: Promise<Page> }>()
 const KEEP_MS = 10 * 60_000
+const copy = (p: Page): Page => ({ hasMore: p.hasMore, items: p.items.map((i) => ({ ...i })) })
 
-export async function searchImages(q: string, page: number, source: Source = 'mix'): Promise<Page> {
-  const key = `${source}|${q.toLowerCase()}|${page}`
-  const hit = recent.get(key)
-  if (!hit || Date.now() - hit.at > KEEP_MS) {
-    recent.set(key, { at: Date.now(), page: await search(q, page, source) })
-    if (recent.size > 60) recent.delete(recent.keys().next().value!)
+function remembered(name: string, search: Search): Search {
+  return (q, page) => {
+    const key = `${name}|${q.toLowerCase()}|${page}`
+    const hit = recent.get(key)
+    if (hit && Date.now() - hit.at < KEEP_MS) return hit.page.then(copy)
+    const p = search(q, page)
+    recent.set(key, { at: Date.now(), page: p })
+    p.catch(() => recent.delete(key))
+    if (recent.size > 80) recent.delete(recent.keys().next().value!)
+    return p.then(copy)
   }
-  const { page: p } = recent.get(key)!
-  // Copies, so the page can annotate its results without changing the cache.
-  return { hasMore: p.hasMore, items: p.items.map((i) => ({ ...i })) }
+}
+const newPhotos = remembered('new', searchUnsplash)
+const oldPhotos = remembered('old', searchOld)
+
+export function searchImages(q: string, page: number, source: Source = 'mix', onLate?: (p: Page) => void): Promise<Page> {
+  if (!unsplashEnabled || source === 'old') return oldPhotos(q, page)
+  if (source === 'new') return newPhotos(q, page)
+  return mixed(newPhotos, oldPhotos, q, page, onLate)
 }

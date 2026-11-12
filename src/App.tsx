@@ -89,7 +89,7 @@ export default function App() {
       <main>{page}</main>
       <footer className="foot">
         made with ♥ for the tumblr kids · no ads, no tracking, ever · photos from{' '}
-        {LIBRARIES.map((l, i) => <span key={l.name}>{i > 0 && ' and '}<a href={l.url} target="_blank" rel="noreferrer noopener">{l.name}</a></span>)}, shared by their creators
+        {LIBRARIES.map((l, i) => <span key={l.name}>{i > 0 && ' and '}<a href={l.url} target="_blank" rel="noreferrer noopener">{l.name}</a></span>)}, shared by their creators under open licenses
         {flickrEnabled && <><br />This product uses the Flickr API but is not endorsed or certified by SmugMug, Inc.</>}
         <nav>
           {LEGAL_LINKS.map(([path, label]) => <a key={path} href={`#/about/${path}`}>{label}</a>)}
@@ -144,24 +144,33 @@ function Discover({ q, isTag, onOpen, source, setSource }: { q: string; isTag: b
   const busy = useRef(false)
   const sentinel = useRef<HTMLDivElement>(null)
 
+  const live = useRef(true)
+  useEffect(() => () => { live.current = false }, [])
+
+  /** Fills in hearts from people here, drops anything taken down, and appends. */
+  const addBatch = async (batch: Img[]) => {
+    const known = await api.lookupExternal(batch).catch(() => [])
+    const ids = new Map(known.map((k) => [k.key, k.id]))
+    const gone = new Set(known.filter((k) => k.removed).map((k) => k.key)) // taken down here
+    const kept = batch.filter((i) => !gone.has(i.key))
+    kept.forEach((i) => { i.id = ids.get(i.key) })
+    actions.noteCounts(known)
+    setItems((old) => {
+      const seen = new Set(old.map((i) => i.key))
+      return [...old, ...kept.filter((i) => !seen.has(i.key))]
+    })
+    return kept.length
+  }
+
   const load = async (n: number) => {
     if (busy.current) return
     busy.current = true
     setLoading(true); setError('')
     try {
-      const res = await searchImages(term, n, source)
-      // Fill in hearts from people here before showing the batch.
-      const known = await api.lookupExternal(res.items).catch(() => [])
-      const ids = new Map(known.map((k) => [k.key, k.id]))
-      const gone = new Set(known.filter((k) => k.removed).map((k) => k.key)) // taken down here
-      res.items = res.items.filter((i) => !gone.has(i.key))
-      res.items.forEach((i) => { i.id = ids.get(i.key) })
-      actions.noteCounts(known)
-      setItems((old) => {
-        const seen = new Set(old.map((i) => i.key))
-        return [...old, ...res.items.filter((i) => !seen.has(i.key))]
-      })
-      setPage(n); setMore(res.hasMore && res.items.length > 0)
+      // Old photos that arrive after the new ones are added at the end.
+      const res = await searchImages(term, n, source, (lateOnes) => { if (live.current) addBatch(lateOnes.items) })
+      const added = await addBatch(res.items)
+      setPage(n); setMore(res.hasMore && added > 0)
     } catch (e) {
       console.error(e)
       setMore(false)
@@ -193,7 +202,7 @@ function Discover({ q, isTag, onOpen, source, setSource }: { q: string; isTag: b
         )}
       {canChooseSource && (
         <div className="source" role="group" aria-label="Which photos">
-          {([['mix', 'everything'], ['new', 'new photos'], ['old', 'old photos · Flickr']] as const).map(([v, label]) => (
+          {([['mix', 'everything'], ['new', 'new photos'], ['old', 'old photos']] as const).map(([v, label]) => (
             <button key={v} aria-pressed={source === v} onClick={() => setSource(v)}>{label}</button>
           ))}
         </div>
@@ -206,7 +215,7 @@ function Discover({ q, isTag, onOpen, source, setSource }: { q: string; isTag: b
       {error && (
         <p className="empty" role="alert">{error}<br /><button onClick={() => load(items.length ? page + 1 : 1)}>try again</button></p>
       )}
-      {loading && <p className="empty">loading pretty things…</p>}
+      {loading && <p className="empty">{source === 'old' || !canChooseSource ? 'digging through the archives…' : 'loading pretty things…'}</p>}
       <div ref={sentinel} />
     </>
   )

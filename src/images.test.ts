@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { fromFlickr } from './flickr'
 import { interleave, mixed } from './images'
+import { flickrCardSize } from './openverse'
 
 describe('mixing photo libraries', () => {
   it('alternates results and keeps the leftovers', () => {
@@ -12,6 +13,20 @@ describe('mixing photo libraries', () => {
     const broken = async () => { throw new Error('down') }
     await expect(mixed(ok, broken, 'cars', 1)).resolves.toEqual({ items: [{ key: 'u:1' }], hasMore: true })
     await expect(mixed(broken, broken, 'cars', 1)).rejects.toThrow('down')
+  })
+  it("shows the fast library first and adds the slow one when it arrives", async () => {
+    const fast = async () => ({ items: [{ key: 'new' }] as never[], hasMore: false })
+    const slow = () => new Promise<{ items: never[]; hasMore: boolean }>((r) => setTimeout(() => r({ items: [{ key: 'old' }] as never[], hasMore: true }), 50))
+    const late: unknown[] = []
+    const page = await mixed(fast, slow, 'cars', 1, (p) => late.push(p), 10)
+    expect(page).toEqual({ items: [{ key: 'new' }], hasMore: true })
+    await new Promise((r) => setTimeout(r, 80))
+    expect(late).toEqual([{ items: [{ key: 'old' }], hasMore: true }])
+  })
+  it('waits for the slow library when the fast one failed', async () => {
+    const broken = async () => { throw new Error('down') }
+    const slow = () => new Promise<{ items: never[]; hasMore: boolean }>((r) => setTimeout(() => r({ items: [{ key: 'old' }] as never[], hasMore: false }), 30))
+    await expect(mixed(broken, slow, 'cars', 1, undefined, 5)).resolves.toEqual({ items: [{ key: 'old' }], hasMore: false })
   })
 })
 
@@ -34,5 +49,17 @@ describe('fromFlickr', () => {
     expect(fromFlickr({ ...photo, datetakenunknown: '1' })!.year).toBeUndefined()
     expect(fromFlickr({ id: '9', owner: 'x' })).toBeNull()
     expect(fromFlickr({ ...photo, url_l: 'http://insecure/x.jpg', url_z: undefined })).toBeNull()
+  })
+})
+
+describe('flickrCardSize', () => {
+  it("swaps a Flickr photo for its 640px version", () => {
+    expect(flickrCardSize('https://live.staticflickr.com/2687/4393049592_63f32487cb_b.jpg')).toBe('https://live.staticflickr.com/2687/4393049592_63f32487cb_z.jpg')
+    expect(flickrCardSize('https://live.staticflickr.com/2687/4393049592_63f32487cb.jpg')).toBe('https://live.staticflickr.com/2687/4393049592_63f32487cb_z.jpg')
+  })
+  it('leaves sizes with their own secret, and other hosts, alone', () => {
+    expect(flickrCardSize('https://live.staticflickr.com/2687/4393049592_0a1b2c3d4e_o.jpg')).toBeUndefined()
+    expect(flickrCardSize('https://live.staticflickr.com/2687/4393049592_0a1b2c3d4e_k.jpg')).toBeUndefined()
+    expect(flickrCardSize('https://example.com/a_b.jpg')).toBeUndefined()
   })
 })
