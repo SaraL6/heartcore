@@ -44,7 +44,7 @@ and take everything with you whenever you want.
 
 | | |
 | --- | --- |
-| ![A profile with a cover image, in the daydream theme](docs/screenshots/profile.jpg) | ![The friends feed, in the soft grunge theme](docs/screenshots/friends.jpg) |
+| ![A profile with a cover image, in the daydream theme](docs/screenshots/profile.jpg) | ![The friends feed, in the darkroom vibe](docs/screenshots/friends.jpg) |
 | A profile in its owner's theme and colour, with mood, visit counter and top 8 | The friends feed |
 | ![An open image with collections and credit](docs/screenshots/image.jpg) | <img src="docs/screenshots/phone.jpg" alt="Discover on a phone, in the galaxy theme" width="260"> |
 | Saving to a collection, with photographer credit | On a phone |
