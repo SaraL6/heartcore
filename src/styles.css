@@ -152,8 +152,10 @@ main { max-width: 1400px; margin: 0 auto; padding: 18px max(20px, env(safe-area-
 .foot { text-align: center; color: var(--muted); font-size: 12px; padding: 24px 20px 32px; }
 
 /* the image wall */
-.grid { columns: 5 230px; column-gap: 16px; }
-.card { position: relative; break-inside: avoid; margin: 0 0 20px; }
+.grid { display: flex; align-items: flex-start; gap: 16px; }
+.grid-col { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.card[hidden] { display: none; }
+.card { position: relative; margin: 0 0 20px; }
 .card.saving { z-index: 6; }
 .card-frame { position: relative; border-radius: var(--card-radius); overflow: hidden; background: var(--chip); box-shadow: var(--shadow); transform: translateZ(0); transition: transform 0.25s ease, box-shadow 0.25s; }
 .card-frame:hover { transform: translateY(-3px); }
@@ -387,7 +389,7 @@ select, textarea { font: inherit; color: inherit; background: var(--card); borde
   .main-nav a, .main-nav .link { flex: 1; text-align: center; }
   .vibe-pop { position: fixed; top: auto; bottom: max(16px, env(safe-area-inset-bottom, 0px)); left: 16px; right: 16px; width: auto; }
   main { padding: 12px max(16px, env(safe-area-inset-right, 0px)) 60px max(16px, env(safe-area-inset-left, 0px)); }
-  .grid { columns: 2 140px; column-gap: 12px; }
+  .grid { gap: 12px; }
   .card { margin-bottom: 14px; }
   .card footer { padding-top: 6px; }
   .post-modal { grid-template-columns: 1fr; }

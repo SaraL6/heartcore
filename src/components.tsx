@@ -98,13 +98,13 @@ export function useDismiss(open: boolean, close: () => void) {
   return ref
 }
 
-function Card({ img, onOpen, onDead, saving, setSaving }: {
-  img: Img; onOpen: (i: Img) => void; onDead: () => void; saving: boolean; setSaving: (key: string | null) => void
+function Card({ img, onOpen, onDead, saving, setSaving, hidden }: {
+  img: Img; onOpen: (i: Img) => void; onDead: () => void; saving: boolean; setSaving: (key: string | null) => void; hidden?: boolean
 }) {
   const close = useCallback(() => setSaving(null), [setSaving])
   const pop = useDismiss(saving, close)
   return (
-    <article className={`card${saving ? ' saving' : ''}`} ref={pop as React.RefObject<HTMLElement>}>
+    <article className={`card${saving ? ' saving' : ''}`} ref={pop as React.RefObject<HTMLElement>} hidden={hidden}>
       <div className="card-frame">
         <button className="card-media" onClick={() => onOpen(img)} aria-label={`Open ${img.caption || 'image'}`}>
           <Media img={img} onDead={onDead} />
@@ -120,16 +120,55 @@ function Card({ img, onOpen, onDead, saving, setSaving }: {
   )
 }
 
+/** Height for width of a card's picture, as best we know before it loads. */
+function shape(img: Img): number {
+  if (img.kind === 'text') return (img.body?.length ?? 0) > 160 ? 1 : 0.75
+  return img.width && img.height ? Math.min(img.height / img.width, 2.5) : 1
+}
+
+/**
+ * Deals cards into columns, each to the currently shortest one. Cards are only
+ * ever added, never moved: loading more at the bottom leaves everything above
+ * where it was.
+ */
+export function dealColumns<T>(items: T[], columns: number, heightOf: (item: T) => number): T[][] {
+  const cols: T[][] = Array.from({ length: columns }, () => [])
+  const heights = new Array(columns).fill(0)
+  for (const item of items) {
+    const i = heights.indexOf(Math.min(...heights))
+    cols[i].push(item)
+    heights[i] += heightOf(item) + 0.18 // the byline under each card
+  }
+  return cols
+}
+
+const COLUMN_MIN = 230
+const columnsFor = (width: number) => (width < 720 ? 2 : Math.max(2, Math.min(6, Math.floor((width + 16) / (COLUMN_MIN + 16)))))
+
 export function Grid({ images, onOpen, empty }: { images: Img[]; onOpen: (i: Img) => void; empty: string }) {
   const [dead, setDead] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState<string | null>(null)
-  const shown = images.filter((i) => !dead.has(i.key))
-  if (!shown.length) return <p className="empty">{empty}</p>
+  const ref = useRef<HTMLDivElement>(null)
+  const [columns, setColumns] = useState(() => columnsFor(Math.min(window.innerWidth, 1400) - 40))
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const ro = new ResizeObserver(([entry]) => setColumns(columnsFor(entry.contentRect.width)))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [images.length > 0])
+  if (!images.length) return <p className="empty">{empty}</p>
+  // Broken images are hidden in place rather than removed, so nothing below them moves.
+  const cols = dealColumns(images, columns, shape)
   return (
-    <div className="grid">
-      {shown.map((img) => (
-        <Card key={img.key} img={img} onOpen={onOpen} saving={saving === img.key} setSaving={setSaving}
-          onDead={() => setDead((d) => new Set(d).add(img.key))} />
+    <div className="grid" ref={ref}>
+      {cols.map((col, i) => (
+        <div className="grid-col" key={i}>
+          {col.map((img) => (
+            <Card key={img.key} img={img} onOpen={onOpen} saving={saving === img.key} setSaving={setSaving}
+              hidden={dead.has(img.key)} onDead={() => setDead((d) => new Set(d).add(img.key))} />
+          ))}
+        </div>
       ))}
     </div>
   )
