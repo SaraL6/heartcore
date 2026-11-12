@@ -11,7 +11,7 @@ const pings = new Map<string, string>() // photo id -> "download" tracking URL
 
 export async function searchUnsplash(q: string, page: number): Promise<{ items: Img[]; hasMore: boolean }> {
   const u = new URL('https://api.unsplash.com/search/photos')
-  u.search = new URLSearchParams({ query: q, page: String(page), per_page: '30', content_filter: 'high' }).toString()
+  u.search = new URLSearchParams({ query: q, page: String(page), per_page: '30', content_filter: 'high', orientation: 'portrait' }).toString()
   const res = await fetch(u, { headers: { Authorization: `Client-ID ${KEY}`, 'Accept-Version': 'v1' }, signal: AbortSignal.timeout(20_000) }).catch(() => null)
   if (!res) throw new Error("couldn't reach the image library — check your connection")
   if (res.status === 403 || res.status === 429) throw new Error('we hit the hourly limit of the image library — try again in a little while')

@@ -3,6 +3,7 @@ import * as api from './api'
 import { AuthModal, FollowButton, Grid, HeartIcon, Media, PostModal, UploadModal, useDismiss, useLoad } from './components'
 import { LEGAL_LINKS, LegalPage } from './legal'
 import { MUSIC_REF, MusicPlayer } from './music'
+import { HOME, TOPICS } from './vibes'
 import { AboutBox, Guestbook, TopButton, TopFriends, useAccent } from './profile'
 import { flickrEnabled } from './flickr'
 import { LIBRARIES, canChooseSource, searchImages, type Source } from './images'
@@ -29,10 +30,7 @@ const THEMES: { id: Theme; label: string; note: string }[] = [
   { id: 'dream', label: 'daydream', note: 'lilac haze' },
 ]
 // Topics for everyone who curates, not just one kind of moodboard.
-const VIBES = ['vintage', 'streetwear', 'sneakers', 'cars', 'architecture', 'interiors', 'film photography', 'tattoos',
-  'skateboarding', 'vinyl', 'y2k', 'grunge', 'pastel', 'nature', 'travel', 'coffee', 'art', 'cats']
-// The home feed opens on a different vibe each visit.
-const HOME = ['aesthetic', 'vintage', 'film photography', 'architecture', 'streetwear', 'interiors', 'nature', 'cars']
+const VIBES = TOPICS
 const homeVibe = HOME[Math.floor(Math.random() * HOME.length)]
 type Open = (img: Img) => void
 
@@ -50,6 +48,7 @@ export default function App() {
   useEffect(() => { initAuth() }, [])
   const shownTheme = s.visitTheme ?? s.theme
   useEffect(() => { document.documentElement.dataset.theme = shownTheme }, [shownTheme])
+  useEffect(() => { document.documentElement.dataset.filter = s.filter ? 'on' : 'off' }, [s.filter])
   useEffect(() => { setOpen(null) }, [route])
 
   const [, section, arg = '', sub = ''] = route.split('/')
@@ -474,6 +473,7 @@ function AdminPage() {
 // ---------- vibe (theme) picker ----------
 
 function VibePicker({ shown, mine }: { shown: Theme; mine: Theme }) {
+  const { filter } = useStore()
   const [open, setOpen] = useState(false)
   const close = useCallback(() => setOpen(false), [])
   const ref = useDismiss(open, close)
@@ -486,6 +486,10 @@ function VibePicker({ shown, mine }: { shown: Theme; mine: Theme }) {
       {open && (
         <div className="vibe-pop" role="dialog" aria-label="Vibes">
           <p className="pop-title">pick your vibe{visiting && <small>you're seeing this page in its owner's vibe</small>}</p>
+          <label className="filter-toggle">
+            <input type="checkbox" checked={filter} onChange={actions.toggleFilter} />
+            <span><b>2012 photo filter</b><small>faded, tinted, a little grain. Open a photo to see it as taken.</small></span>
+          </label>
           {THEMES.map((t) => (
             <button key={t.id} aria-pressed={mine === t.id} onClick={() => { actions.setTheme(t.id); setOpen(false) }}>
               <span className={`swatch ${t.id}`} />
