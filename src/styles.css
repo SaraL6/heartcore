@@ -198,6 +198,8 @@ main { max-width: 1400px; margin: 0 auto; padding: 18px max(20px, env(safe-area-
 .heart-btn.on { color: var(--accent); }
 .heart-btn.on svg { animation: pop 0.35s ease-out; }
 .heart-btn.big { border: 1px solid var(--line); border-radius: 99px; padding: 9px 18px; font-size: 15px; align-self: flex-start; }
+.post-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.share { border-radius: 99px; padding: 9px 18px; font-size: 15px; }
 .heart-btn.big.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
 @keyframes pop { 0% { transform: scale(0.6); } 55% { transform: scale(1.4); } 100% { transform: scale(1); } }
 

@@ -55,6 +55,7 @@ type State = {
   music: string | null // Spotify "type/id" in the player
   musicOpen: boolean
   authOpen: boolean
+  recovering: boolean // arrived from a password-reset email; ask for a new password
   toast: string
   rev: number // bumped when lists should reload (after posting or deleting)
 }
@@ -65,7 +66,7 @@ const savedFilter = (() => { try { return localStorage.getItem('heartcore:filter
 const savedTheme = (() => { try { return localStorage.getItem('heartcore:theme') as Theme | null } catch { return null } })()
 let state: State = {
   ready: !supabase, me: null, isAdmin: false, hearted: {}, counts: {}, following: [], top: {},
-  theme: savedTheme ?? 'pastel', visitTheme: null, quiet: savedQuiet, filter: savedFilter, music: savedMusic, musicOpen: false, authOpen: false, toast: '', rev: 0,
+  theme: savedTheme ?? 'pastel', visitTheme: null, quiet: savedQuiet, filter: savedFilter, music: savedMusic, musicOpen: false, authOpen: false, recovering: false, toast: '', rev: 0,
 }
 const listeners = new Set<() => void>()
 const set = (patch: Partial<State>) => { state = { ...state, ...patch }; listeners.forEach((l) => l()) }
@@ -128,7 +129,10 @@ export function initAuth() {
   }
   supabase.auth.getSession().then(({ data }) => apply(data.session?.user.id ?? null))
   // Defer: Supabase calls made directly inside this callback can deadlock.
-  supabase.auth.onAuthStateChange((_e, session) => { setTimeout(() => apply(session?.user.id ?? null), 0) })
+  supabase.auth.onAuthStateChange((event, session) => {
+    if (event === 'PASSWORD_RECOVERY') set({ recovering: true, authOpen: false })
+    setTimeout(() => apply(session?.user.id ?? null), 0)
+  })
 }
 
 /** Make sure a picture from the outside library has a row in our database. */
@@ -178,6 +182,7 @@ export const actions = {
     set({ quiet: !state.quiet })
   },
   openAuth: (open: boolean) => set({ authOpen: open }),
+  doneRecovering: () => set({ recovering: false }),
   refresh: () => set({ rev: state.rev + 1 }),
   setMe: (me: Profile) => set({ me }),
   noteCounts(found: { key: string; id: string; heartCount: number }[]) {

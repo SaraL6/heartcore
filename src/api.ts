@@ -229,6 +229,28 @@ export async function signUp(email: string, password: string, username: string) 
   if (error) throw error
   return { needsEmailConfirm: !data.session }
 }
+/** Emails a link that brings the person back here to choose a new password. */
+export async function sendPasswordReset(email: string) {
+  const { error } = await db().auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname })
+  if (error) throw error
+}
+export async function setNewPassword(password: string) {
+  const { error } = await db().auth.updateUser({ password })
+  if (error) throw error
+}
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+/** One picture by its id, for shared links. Null if it's gone or was taken down. */
+export async function getImage(id: string): Promise<Img | null> {
+  if (!UUID.test(id)) return null
+  const row = ok(await db().from('images').select(SELECT_IMG).eq('id', id).maybeSingle())
+  return row ? toImg(row) : null
+}
+/** The address to share for a picture, saving a library picture first if needed. */
+export async function shareLink(img: Img): Promise<string> {
+  return `${location.origin}${location.pathname}#/i/${await ensureSaved(img)}`
+}
+
 export async function signIn(email: string, password: string) {
   const { error } = await db().auth.signInWithPassword({ email, password })
   if (error) throw error

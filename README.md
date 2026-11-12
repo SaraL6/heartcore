@@ -27,6 +27,7 @@ and take everything with you whenever you want.
   to drop it straight into a collection, Pinterest-style
 - **Post** — upload a jpg/png/gif, share an image link, or post some words
   as a quote card in one of four styles
+- **Share** — every picture has its own link to copy and send
 - **Friends** — follow people and see what they heart, in the order it happened
 - **Your canvas** — pick any image as your profile cover; visitors see your
   page in the vibe you chose: pastel, darkroom, y2k chrome, soft grunge, galaxy,
@@ -137,8 +138,9 @@ Good to know:
   **Authentication → Sign In / Providers → Email → Confirm email**.
 - The built-in Supabase email sender only allows a few emails per hour. For a
   real launch, connect your own email provider under **Authentication → SMTP**.
-- When you deploy, add your site's address under
-  **Authentication → URL Configuration** so confirmation links come back to it.
+- When you deploy, set your site's address as the **Site URL** under
+  **Authentication → URL Configuration**. Confirmation and password-reset
+  emails send people back to that address.
 - The anon key is safe to ship in the site. Never put the `service_role` key
   in `.env.local` or anywhere in this repo.
 

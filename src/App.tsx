@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from './api'
-import { AuthModal, FollowButton, Grid, HeartIcon, Media, PostModal, UploadModal, useDismiss, useLoad } from './components'
+import { AuthModal, FollowButton, Grid, HeartIcon, Media, NewPasswordModal, PostModal, UploadModal, useDismiss, useLoad } from './components'
 import { LEGAL_LINKS, LegalPage } from './legal'
 import { MUSIC_REF, MusicPlayer } from './music'
 import { HOME, TOPICS } from './vibes'
@@ -52,6 +52,17 @@ export default function App() {
   useEffect(() => { setOpen(null) }, [route])
 
   const [, section, arg = '', sub = ''] = route.split('/')
+  // A shared link (#/i/<id>) opens that picture over the home feed.
+  const sharedId = section === 'i' ? arg : ''
+  useEffect(() => {
+    if (!sharedId) return
+    let live = true
+    const gone = () => { if (live) { toast("that picture isn't here anymore"); location.hash = '#/' } }
+    if (!supabase) { gone(); return }
+    api.getImage(sharedId).then((img) => { if (!live) return; if (img) setOpen(img); else gone() }, gone)
+    return () => { live = false }
+  }, [sharedId])
+  const closeImage = () => { setOpen(null); if (sharedId) location.hash = '#/' }
   let page: React.ReactNode
   if (section === 'friends') page = <Friends tab={arg} onOpen={setOpen} />
   else if (section === 'u') page = <ProfilePage key={arg} username={arg} tab={sub} onOpen={setOpen} />
@@ -96,9 +107,10 @@ export default function App() {
           {s.isAdmin && <a href="#/admin">moderation</a>}
         </nav>
       </footer>
-      {open && <PostModal img={open} onClose={() => setOpen(null)} />}
+      {open && <PostModal img={open} onClose={closeImage} />}
       {uploading && <UploadModal onClose={() => setUploading(false)} />}
       {s.authOpen && <AuthModal />}
+      {s.recovering && <NewPasswordModal />}
       <MusicPlayer />
       {s.toast && <div className="toast" role="status">{s.toast}</div>}
     </>
