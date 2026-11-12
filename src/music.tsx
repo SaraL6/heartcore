@@ -21,6 +21,33 @@ export function parseSpotify(text: string): string | null {
   return m ? `${m[1]}/${m[2]}` : null
 }
 
+// Spotify's public link lookup gives the name and cover of what's playing,
+// which the embedded player won't tell the page.
+type Info = { title: string; art?: string }
+const known = new Map<string, Info>()
+function useSpotifyInfo(ref: string | null): Info | null {
+  const [info, setInfo] = useState<Info | null>(ref ? known.get(ref) ?? null : null)
+  useEffect(() => {
+    if (!ref) return setInfo(null)
+    if (known.has(ref)) return setInfo(known.get(ref)!)
+    setInfo(null)
+    let live = true
+    fetch(`https://open.spotify.com/oembed?url=${encodeURIComponent(`https://open.spotify.com/${ref}`)}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d?.title) return
+        const found = { title: String(d.title), art: typeof d.thumbnail_url === 'string' && d.thumbnail_url.startsWith('https://') ? d.thumbnail_url : undefined }
+        known.set(ref, found)
+        if (live) setInfo(found)
+      })
+      .catch(() => {})
+    return () => { live = false }
+  }, [ref])
+  return info
+}
+
+const KIND_LABEL: Record<string, string> = { playlist: 'playlist', album: 'album', track: 'song', artist: 'artist', show: 'podcast', episode: 'episode' }
+
 export function MusicPlayer() {
   const { musicOpen } = useStore()
   // Closing the player unmounts it, which also stops a connected Spotify player.
@@ -39,6 +66,7 @@ function Player() {
   const [starting, setStarting] = useState(false)
   const played = useRef<string | null>(null)
   const valid = music && MUSIC_REF.test(music) ? music : null
+  const info = useSpotifyInfo(valid)
 
   useEffect(() => () => { full?.player.disconnect() }, [full])
 
@@ -90,12 +118,28 @@ function Player() {
 
   return (
     <aside className={`music${small ? ' small' : ''}`} aria-label="Music player">
-      <header>
-        <span>♫ {valid ? (full ? 'playing from your Spotify' : 'now playing') : 'play something'}</span>
-        {valid && <button className="link" onClick={() => setSmall(!small)} aria-label={small ? 'Show player' : 'Tuck player away'}>{small ? 'show' : 'tuck away'}</button>}
-        <button className="link" onClick={() => actions.setMusicOpen(false)} aria-label="Close player">×</button>
-      </header>
-      {valid && full && (
+      {small && valid ? (
+        // Tucked away: a slim bar that still says what's on.
+        <div className="mini">
+          {(full ? now?.art : info?.art) ? <img src={full ? now?.art : info?.art} alt="" /> : <span className="art" />}
+          <button className="what" onClick={() => setSmall(false)} aria-label="Show player">
+            <strong>{(full ? now?.title : info?.title) ?? 'now playing'}</strong>
+            <small>
+              {full && now && !now.paused && <span className="eq" aria-hidden="true"><i /><i /><i /></span>}
+              {full ? now?.artist ?? 'Spotify' : `${KIND_LABEL[valid.split('/')[0]]} on Spotify`}
+            </small>
+          </button>
+          {full && <button className="round" onClick={() => full.player.togglePlay()} aria-label={now?.paused ? 'Play' : 'Pause'}>{now?.paused ? '▶' : '⏸'}</button>}
+          <button className="round" onClick={() => actions.setMusicOpen(false)} aria-label="Close player">×</button>
+        </div>
+      ) : (
+        <header>
+          <span>♫ {valid ? (full ? 'playing from your Spotify' : info?.title ?? 'now playing') : 'play something'}</span>
+          {valid && <button className="link" onClick={() => setSmall(true)} aria-label="Tuck player away">tuck away</button>}
+          <button className="link" onClick={() => actions.setMusicOpen(false)} aria-label="Close player">×</button>
+        </header>
+      )}
+      {valid && full && !small && (
         <div className="now">
           {now?.art ? <img src={now.art} alt="" /> : <span className="art" />}
           <div className="what">

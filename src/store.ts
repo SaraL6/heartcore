@@ -2,7 +2,7 @@ import { useSyncExternalStore } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import { trackUse } from './unsplash'
 
-export type Theme = 'pastel' | 'grunge' | 'galaxy' | 'vintage' | 'dream'
+export type Theme = 'pastel' | 'grunge' | 'galaxy' | 'vintage' | 'dream' | 'y2k' | 'darkroom'
 
 // One picture, wherever it came from. `id` is set once it exists in our
 // database; `key` identifies it either way (so we know what you've hearted

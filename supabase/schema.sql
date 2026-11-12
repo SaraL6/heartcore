@@ -399,3 +399,8 @@ alter table public.images add constraint images_content_check check (
 -- A report on a text post has no picture address; it carries the words instead.
 alter table public.reports alter column url drop not null;
 alter table public.reports add column if not exists excerpt text check (excerpt is null or char_length(excerpt) <= 300);
+
+-- ---------- more vibes ----------
+alter table public.profiles drop constraint if exists profiles_theme_check;
+alter table public.profiles add constraint profiles_theme_check
+  check (theme in ('pastel', 'grunge', 'galaxy', 'vintage', 'dream', 'y2k', 'darkroom'));

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from './api'
 import { Notes } from './profile'
 import { actions, fmt, heartCount, requireMe, supabase, toast, useStore, type Img } from './store'
@@ -33,16 +33,19 @@ export function TextCard({ body, style }: { body: string; style?: string }) {
   return <div className={`textpost ${style ?? 'ink'} ${size}`}><p>{body}</p></div>
 }
 
-export function Media({ img, onDead }: { img: Img; onDead?: () => void }) {
-  const [src, setSrc] = useState(img.url)
+/** An image, sized for a card unless `full`. Falls back to the other size, then gives up. */
+export function Media({ img, onDead, full }: { img: Img; onDead?: () => void; full?: boolean }) {
+  // Unsplash's small size is plenty for a card and loads several times faster.
+  const first = !full && img.provider === 'unsplash' && img.thumb ? img.thumb : img.url
+  const second = first === img.url ? img.thumb : img.url
+  const [src, setSrc] = useState(first)
   if (img.kind === 'text') return <TextCard body={img.body ?? ''} style={img.style} />
   return (
     <img
-      src={src} alt={img.caption || 'image'} loading="lazy"
+      src={src} alt={img.caption || 'image'} loading="lazy" decoding="async"
       width={img.width} height={img.height}
       style={img.width && img.height ? { aspectRatio: `${img.width} / ${img.height}` } : undefined}
-      // Old photos disappear from their hosts; try the library's own copy, then give up.
-      onError={() => (img.thumb && src !== img.thumb ? setSrc(img.thumb) : onDead?.())}
+      onError={() => (second && src !== second ? setSrc(second) : onDead?.())}
     />
   )
 }
@@ -80,19 +83,52 @@ function Byline({ img }: { img: Img }) {
   return <span className="author">{img.credit ? `by ${img.credit}` : ''}</span>
 }
 
+/** Closes a popover when you click outside it or press Escape. */
+export function useDismiss(open: boolean, close: () => void) {
+  const ref = useRef<HTMLDivElement & HTMLElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) close() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [open, close])
+  return ref
+}
+
+function Card({ img, onOpen, onDead, saving, setSaving }: {
+  img: Img; onOpen: (i: Img) => void; onDead: () => void; saving: boolean; setSaving: (key: string | null) => void
+}) {
+  const close = useCallback(() => setSaving(null), [setSaving])
+  const pop = useDismiss(saving, close)
+  return (
+    <article className={`card${saving ? ' saving' : ''}`} ref={pop as React.RefObject<HTMLElement>}>
+      <div className="card-frame">
+        <button className="card-media" onClick={() => onOpen(img)} aria-label={`Open ${img.caption || 'image'}`}>
+          <Media img={img} onDead={onDead} />
+        </button>
+        <button className="save-btn" aria-expanded={saving} onClick={() => requireMe() && setSaving(saving ? null : img.key)}>
+          {saving ? 'done' : 'save'}
+        </button>
+      </div>
+      {/* Outside the image frame, so a short image doesn't cut it off. */}
+      {saving && <div className="save-pop" role="dialog" aria-label="Save to a collection"><SaveToCollection img={img} /></div>}
+      <footer><Byline img={img} /><HeartButton img={img} /></footer>
+    </article>
+  )
+}
+
 export function Grid({ images, onOpen, empty }: { images: Img[]; onOpen: (i: Img) => void; empty: string }) {
   const [dead, setDead] = useState<Set<string>>(new Set())
+  const [saving, setSaving] = useState<string | null>(null)
   const shown = images.filter((i) => !dead.has(i.key))
   if (!shown.length) return <p className="empty">{empty}</p>
   return (
     <div className="grid">
       {shown.map((img) => (
-        <article key={img.key} className="card">
-          <button className="card-media" onClick={() => onOpen(img)} aria-label={`Open ${img.caption || 'image'}`}>
-            <Media img={img} onDead={() => setDead((d) => new Set(d).add(img.key))} />
-          </button>
-          <footer><Byline img={img} /><HeartButton img={img} /></footer>
-        </article>
+        <Card key={img.key} img={img} onOpen={onOpen} saving={saving === img.key} setSaving={setSaving}
+          onDead={() => setDead((d) => new Set(d).add(img.key))} />
       ))}
     </div>
   )
@@ -227,7 +263,7 @@ export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
     <Modal onClose={onClose} label="Image">
       <div className="post-modal">
         <div className="post-media" onDoubleClick={love} title="double-click to heart">
-          <Media img={img} />
+          <Media img={img} full />
           {burst > 0 && <span key={burst} className="burst"><HeartIcon filled /></span>}
         </div>
         <aside>

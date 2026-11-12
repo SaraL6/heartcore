@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from './api'
-import { AuthModal, FollowButton, Grid, HeartIcon, Media, PostModal, UploadModal, useLoad } from './components'
+import { AuthModal, FollowButton, Grid, HeartIcon, Media, PostModal, UploadModal, useDismiss, useLoad } from './components'
 import { LEGAL_LINKS, LegalPage } from './legal'
 import { MUSIC_REF, MusicPlayer } from './music'
 import { AboutBox, Guestbook, TopButton, TopFriends, useAccent } from './profile'
@@ -18,14 +18,21 @@ function useRoute() {
   return route
 }
 
-const THEMES: { id: Theme; label: string }[] = [
-  { id: 'pastel', label: 'pastel' },
-  { id: 'grunge', label: 'soft grunge' },
-  { id: 'galaxy', label: 'galaxy' },
-  { id: 'vintage', label: 'vintage' },
-  { id: 'dream', label: 'daydream' },
+const THEMES: { id: Theme; label: string; note: string }[] = [
+  { id: 'pastel', label: 'pastel', note: 'light, airy, a little pink' },
+  { id: 'darkroom', label: 'darkroom', note: 'moody, minimal, film grain' },
+  { id: 'y2k', label: 'y2k chrome', note: 'glossy, icy, a bit extra' },
+  { id: 'grunge', label: 'soft grunge', note: '2013 tumblr, after dark' },
+  { id: 'galaxy', label: 'galaxy', note: 'nebula wallpaper glow' },
+  { id: 'vintage', label: 'vintage', note: 'faded paper and film' },
+  { id: 'dream', label: 'daydream', note: 'lilac haze' },
 ]
-const POPULAR = ['vintage', 'grunge', 'pastel', 'polaroid', 'flowers', 'ocean', 'sunset', 'paris', 'coffee', 'cats', 'fashion', 'film', 'stars', 'summer']
+// Topics for everyone who curates, not just one kind of moodboard.
+const VIBES = ['vintage', 'streetwear', 'sneakers', 'cars', 'architecture', 'interiors', 'film photography', 'tattoos',
+  'skateboarding', 'vinyl', 'y2k', 'grunge', 'pastel', 'nature', 'travel', 'coffee', 'art', 'cats']
+// The home feed opens on a different vibe each visit.
+const HOME = ['aesthetic', 'vintage', 'film photography', 'architecture', 'streetwear', 'interiors', 'nature', 'cars']
+const homeVibe = HOME[Math.floor(Math.random() * HOME.length)]
 type Open = (img: Img) => void
 
 export default function App() {
@@ -55,7 +62,7 @@ export default function App() {
   return (
     <>
       <header className="top">
-        <a className="logo" href="#/"><HeartIcon filled /> heartcore</a>
+        <a className="logo" href="#/"><span className="logo-mark"><HeartIcon filled /></span>heartcore</a>
         <form className="search" role="search" onSubmit={(e) => {
           e.preventDefault()
           location.hash = query.trim() ? `#/search/${encodeURIComponent(query.trim())}` : '#/'
@@ -69,14 +76,9 @@ export default function App() {
             ? <a href={meHref} aria-current={current === 'me' ? 'page' : undefined}>me</a>
             : <button className="link" onClick={() => actions.openAuth(true)}>sign in</button>}
         </nav>
-        <button className="music-btn" aria-pressed={s.musicOpen} aria-label="Music player" title="music"
+        <button className="icon-btn music-btn" aria-pressed={s.musicOpen} aria-label="Music player" title="music"
           onClick={() => actions.setMusicOpen(!s.musicOpen)}>♫</button>
-        <div className="themes" role="group" aria-label="Theme">
-          {THEMES.map((t) => (
-            <button key={t.id} className={`swatch ${t.id}`} title={t.label} aria-label={`${t.label} theme`}
-              aria-pressed={shownTheme === t.id} onClick={() => actions.setTheme(t.id)} />
-          ))}
-        </div>
+        <VibePicker shown={shownTheme} mine={s.theme} />
         <button className="primary" onClick={() => requireMe() && setUploading(true)}>+ post</button>
       </header>
       <main>{page}</main>
@@ -126,7 +128,7 @@ function Tabs({ base, tabs, current }: { base: string; tabs: [string, string][];
 // ---------- discover: browse the outside image library ----------
 
 function Discover({ q, isTag, onOpen }: { q: string; isTag: boolean; onOpen: Open }) {
-  const term = q || 'vintage'
+  const term = q || homeVibe
   const [items, setItems] = useState<Img[]>([])
   const [page, setPage] = useState(1)
   const [more, setMore] = useState(true)
@@ -175,9 +177,16 @@ function Discover({ q, isTag, onOpen }: { q: string; isTag: boolean; onOpen: Ope
     <>
       {q
         ? <PageTitle title={isTag ? `#${q}` : `“${q}”`}><a href="#/">← back to discover</a></PageTitle>
-        : <p className="hello">collect the things you love <HeartIcon filled /> like it's 2012 again</p>}
-      <nav className="chips" aria-label="Popular tags">
-        {POPULAR.map((t) => <a key={t} href={`#/tag/${t}`} className={q === t ? 'on' : ''}>#{t}</a>)}
+        : (
+          <section className="hero">
+            <p className="kicker">no ads · no algorithm · no AI images</p>
+            <h1>collect what <em>you love</em>.</h1>
+            <p>Your own corner of the internet, like it's 2012 again. Heart it, save it to a board, share it with friends.</p>
+          </section>
+        )}
+      <nav className="chips" aria-label="Topics">
+        {!q && <span className="chip-label">today's vibe: <b>#{homeVibe}</b></span>}
+        {VIBES.map((t) => <a key={t} href={`#/tag/${encodeURIComponent(t)}`} className={q === t ? 'on' : ''}>#{t}</a>)}
       </nav>
       {(items.length > 0 || (!loading && !error)) && <Grid images={items} onOpen={onOpen} empty="nothing found for that — try another word?" />}
       {error && (
@@ -436,5 +445,32 @@ function AdminPage() {
         </ul>
       )}
     </>
+  )
+}
+
+// ---------- vibe (theme) picker ----------
+
+function VibePicker({ shown, mine }: { shown: Theme; mine: Theme }) {
+  const [open, setOpen] = useState(false)
+  const close = useCallback(() => setOpen(false), [])
+  const ref = useDismiss(open, close)
+  const visiting = shown !== mine
+  return (
+    <div className="vibe" ref={ref}>
+      <button className="icon-btn vibe-btn" aria-expanded={open} aria-label="Change your vibe" title="vibe" onClick={() => setOpen(!open)}>
+        <span className={`swatch ${mine}`} />
+      </button>
+      {open && (
+        <div className="vibe-pop" role="dialog" aria-label="Vibes">
+          <p className="pop-title">pick your vibe{visiting && <small>you're seeing this page in its owner's vibe</small>}</p>
+          {THEMES.map((t) => (
+            <button key={t.id} aria-pressed={mine === t.id} onClick={() => { actions.setTheme(t.id); setOpen(false) }}>
+              <span className={`swatch ${t.id}`} />
+              <span><b>{t.label}</b><small>{t.note}</small></span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   )
 }

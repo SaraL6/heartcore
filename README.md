@@ -19,14 +19,17 @@ and take everything with you whenever you want.
 
 ## What it does
 
-- **Discover** — endless scroll of real photos with search and tags, from
-  Unsplash or Openverse
-- **Hearts and collections** — heart anything, organise it into collections
+- **Discover** — endless scroll of real photos with search, from Unsplash or
+  Openverse, across topics for every kind of curator: streetwear, sneakers,
+  cars, architecture, interiors, film photography, tattoos, vinyl and more
+- **Hearts and collections** — heart anything, or hit **save** on any image
+  to drop it straight into a collection, Pinterest-style
 - **Post** — upload a jpg/png/gif, share an image link, or post some words
   as a quote card in one of four styles
 - **Friends** — follow people and see what they heart, in the order it happened
 - **Your canvas** — pick any image as your profile cover; visitors see your
-  page in the theme you chose (pastel, soft grunge, galaxy, vintage, daydream)
+  page in the vibe you chose: pastel, darkroom, y2k chrome, soft grunge, galaxy,
+  vintage or daydream
 - **Make it yours** — a mood, your own profile colour, a top 8 of your
   favourite people, a guestbook for friends to sign, and a little visit counter
 - **Notes** — see who else hearted an image
