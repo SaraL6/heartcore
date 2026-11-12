@@ -399,3 +399,16 @@ alter table public.images add constraint images_content_check check (
 -- A report on a text post has no picture address; it carries the words instead.
 alter table public.reports alter column url drop not null;
 alter table public.reports add column if not exists excerpt text check (excerpt is null or char_length(excerpt) <= 300);
+
+-- ---------- more vibes ----------
+alter table public.profiles drop constraint if exists profiles_theme_check;
+alter table public.profiles add constraint profiles_theme_check
+  check (theme in ('pastel', 'grunge', 'galaxy', 'vintage', 'dream', 'y2k', 'darkroom'));
+
+-- ---------- human-made only ----------
+-- Posting a picture requires the poster to confirm it isn't AI-made or
+-- AI-edited. Text posts don't need it.
+alter table public.images add column if not exists human_made boolean not null default false;
+drop policy if exists "post images" on public.images;
+create policy "post images" on public.images for insert to authenticated
+  with check (provider = 'upload' and uploader_id = auth.uid() and heart_count = 0 and (kind = 'text' or human_made));

@@ -24,16 +24,17 @@ select t_is($$select count(*)::text from images where provider_id = 'abc'$$, '1'
 
 insert into hearts (user_id, image_id) values (auth.uid(), :'ext');
 select t_refused(format($$insert into hearts (user_id, image_id) values (%L, %L)$$, :'mia', :'ext'), 'hearting as someone else');
-insert into images (url, uploader_id) values ('https://x/mine.jpg', auth.uid());
+select t_refused($$insert into images (url, uploader_id) values ('https://x/ai.jpg', auth.uid())$$, 'posting a picture without confirming it is human-made');
+insert into images (url, uploader_id, human_made) values ('https://x/mine.jpg', auth.uid(), true);
 select t_refused(format($$insert into images (url, uploader_id) values ('https://x/z.jpg', %L)$$, :'mia'), 'posting as someone else');
-select t_refused($$insert into images (url, uploader_id, heart_count) values ('https://x/z.jpg', auth.uid(), 999)$$, 'posting with a forged heart count');
-select t_refused($$insert into images (url, uploader_id) values ('javascript:alert(1)', auth.uid())$$, 'posting a non-web address');
+select t_refused($$insert into images (url, uploader_id, heart_count, human_made) values ('https://x/z.jpg', auth.uid(), 999, true)$$, 'posting with a forged heart count');
+select t_refused($$insert into images (url, uploader_id, human_made) values ('javascript:alert(1)', auth.uid(), true)$$, 'posting a non-web address');
 select t_refused($$update images set heart_count = 500$$, 'editing heart counts');
 select t_refused($$update images set removed = false$$, 'un-removing images');
 select t_rows($$insert into images (kind, body, style, uploader_id) values ('text', 'stay weird', 'ink', auth.uid())$$, 1, 'posting words');
 select t_refused($$insert into images (kind, body, uploader_id) values ('text', '   ', auth.uid())$$, 'an empty text post');
 select t_refused($$insert into images (kind, body, url, uploader_id) values ('text', 'hi', 'https://x/y.jpg', auth.uid())$$, 'a text post that also carries a picture');
-select t_refused($$insert into images (kind, uploader_id) values ('image', auth.uid())$$, 'an image post with no picture');
+select t_refused($$insert into images (kind, uploader_id, human_made) values ('image', auth.uid(), true)$$, 'an image post with no picture');
 select t_refused($$insert into images (kind, body, style, uploader_id) values ('text', 'hi', 'comic-sans', auth.uid())$$, 'an unknown card style');
 insert into collections (user_id, name) values (auth.uid(), 'faves') returning id as coll \gset
 insert into collection_images values (:'coll', :'ext');

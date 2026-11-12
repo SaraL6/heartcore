@@ -1,6 +1,6 @@
 # heartcore ♥
 
-[![CI](https://github.com/SaraL6/weheartit-clone/actions/workflows/ci.yml/badge.svg)](https://github.com/SaraL6/weheartit-clone/actions/workflows/ci.yml)
+[![CI](https://github.com/SaraL6/heartcore/actions/workflows/ci.yml/badge.svg)](https://github.com/SaraL6/heartcore/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-ff5c8a.svg)](LICENSE)
 
 **An ad-free place to heart and collect images, built for everyone who misses the Tumblr era.**
@@ -19,29 +19,36 @@ and take everything with you whenever you want.
 
 ## What it does
 
-- **Discover** — endless scroll of real photos with search and tags, from
-  Unsplash or Openverse
-- **Hearts and collections** — heart anything, organise it into collections
+- **Discover** — endless scroll of real photos with search: new ones from
+  Unsplash mixed with old ones from Flickr (or just one, at the flick of a
+  switch), across topics for every kind of curator: streetwear, sneakers,
+  cars, architecture, interiors, film photography, tattoos, vinyl and more
+- **Hearts and collections** — heart anything, or hit **save** on any image
+  to drop it straight into a collection, Pinterest-style
 - **Post** — upload a jpg/png/gif, share an image link, or post some words
   as a quote card in one of four styles
 - **Friends** — follow people and see what they heart, in the order it happened
 - **Your canvas** — pick any image as your profile cover; visitors see your
-  page in the theme you chose (pastel, soft grunge, galaxy, vintage, daydream)
+  page in the vibe you chose: pastel, darkroom, y2k chrome, soft grunge, galaxy,
+  vintage or daydream
 - **Make it yours** — a mood, your own profile colour, a top 8 of your
   favourite people, a guestbook for friends to sign, and a little visit counter
 - **Notes** — see who else hearted an image
-- **Music** — paste a Spotify link to listen while you browse, and put a
-  playlist on your profile for visitors to play
+- **Music** — paste a Spotify link to listen while you browse, connect your
+  Spotify for full songs, and put a playlist on your profile for visitors to play
 - **Take it with you** — "download everything" saves your hearts, posts and
   collections as one web page, so they can never vanish
-- **Human-made only** — no AI-generated images; no ads; no tracking; heart
-  counts can be hidden
+- **Human-made only** — no AI-generated or AI-edited images. Uploads whose
+  files carry AI fingerprints are refused, posting requires confirming the
+  image is human-made, and library photos that describe themselves as AI are
+  filtered out
+- **No ads, no tracking** — and heart counts can be hidden
 - **Safety built in** — report button on every image, a moderation queue,
   takedowns, rules and privacy pages, account deletion
 
 | | |
 | --- | --- |
-| ![A profile with a cover image, in the daydream theme](docs/screenshots/profile.jpg) | ![The friends feed, in the soft grunge theme](docs/screenshots/friends.jpg) |
+| ![A profile with a cover image, in the daydream theme](docs/screenshots/profile.jpg) | ![The friends feed, in the darkroom vibe](docs/screenshots/friends.jpg) |
 | A profile in its owner's theme and colour, with mood, visit counter and top 8 | The friends feed |
 | ![An open image with collections and credit](docs/screenshots/image.jpg) | <img src="docs/screenshots/phone.jpg" alt="Discover on a phone, in the galaxy theme" width="260"> |
 | Saving to a collection, with photographer credit | On a phone |
@@ -66,6 +73,12 @@ Supabase, so the database itself has to enforce who can do what.
 - **One image model, several sources.** Library photos and member uploads
   share one shape, and a library photo is only written to the database the
   first time someone hearts or saves it. Image sources are swappable modules.
+- **Human-made, checked in layers.** Before an upload is resized (which
+  would wipe its metadata), the browser scans the file for the marks AI tools
+  leave: the IPTC/C2PA "trained algorithmic media" source type, generator
+  names, Stable Diffusion's PNG settings. The database refuses picture posts
+  without the poster's human-made confirmation. Neither can catch an image
+  whose metadata was stripped, so reports and takedowns are the backstop.
 - **Untrusted input is treated as untrusted.** Spotify links are reduced to a
   validated `type/id` before a player is ever created, the exported page
   escapes every caption, and uploads are resized in the browser.
@@ -76,10 +89,11 @@ Supabase, so the database itself has to enforce who can do what.
 | --- | --- |
 | `src/store.ts` | Signed-in state: who you are, what you've hearted, who you follow. |
 | `src/api.ts` | Every other database read and write, and the export. |
-| `src/images.ts`, `src/openverse.ts`, `src/unsplash.ts` | Image search: Unsplash if a key is set, otherwise Openverse. |
-| `src/music.tsx` | The Spotify mini player. |
+| `src/images.ts`, `src/unsplash.ts`, `src/flickr.ts`, `src/openverse.ts` | Image search: new photos from Unsplash mixed with old Flickr photos, directly with a Flickr key or through Openverse without one. |
+| `src/music.tsx`, `src/spotify.ts` | The music player, and Spotify sign-in (PKCE) with in-page full-song playback. |
 | `src/profile.tsx` | Profile extras: mood, colour, top 8, guestbook, visit counter. |
 | `src/App.tsx`, `src/components.tsx` | Pages and building blocks. |
+| `src/aicheck.ts` | Spotting AI images: file fingerprints and self-described library photos. |
 | `src/legal.tsx` | Rules, terms, privacy and copyright pages. |
 | `supabase/schema.sql` | Tables, access rules, triggers, storage, reports and moderation. |
 | `supabase/tests/` | Access-rule tests and the stand-ins needed to run them on plain Postgres. |
@@ -123,6 +137,37 @@ Good to know:
   **Authentication → URL Configuration** so confirmation links come back to it.
 - The anon key is safe to ship in the site. Never put the `service_role` key
   in `.env.local` or anywhere in this repo.
+
+## Old photos from Flickr
+
+Discover's "old photos" are Flickr's openly licensed photos. Out of the box
+they come through [Openverse](https://openverse.org), which needs no key but
+can be slow, so the mixed feed shows new photos first and adds old ones as
+they arrive.
+
+If you have Flickr Pro, you can search Flickr directly instead, which is
+faster and limited to uploads from before 2016: create a **non-commercial**
+key in [the App Garden](https://www.flickr.com/services/apps/create/apply/)
+and set its **Key** (never the secret) as `VITE_FLICKR_API_KEY`. Flickr only
+issues API keys to Pro members. Either way, only photos whose owners chose an
+open license, or that have no known copyright restrictions, are shown.
+
+## Full songs with Spotify (optional)
+
+Without this, the music player is Spotify's embed, which plays 30-second
+previews unless the browser lets it see the listener's Spotify login. With
+it, people can press "connect Spotify" and play full songs inside the page
+(Spotify Premium, computer browsers only).
+
+1. At [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard),
+   create an app. Under APIs, tick **Web Playback SDK** and **Web API**.
+2. Add your site's address, with the trailing slash, as a **Redirect URI**,
+   for example `https://heartcore-tau.vercel.app/`.
+3. Copy the **Client ID** (never the client secret) and set it as
+   `VITE_SPOTIFY_CLIENT_ID`, then redeploy.
+4. Under **User Management**, add the Spotify email of each person who should
+   be able to connect. Spotify allows only a small number of hand-added people
+   until it approves an app for wider use; everyone else keeps the previews.
 
 ## Before you open a copy to the public
 

@@ -14,13 +14,14 @@ const PAGES: Record<string, { title: string; body: React.ReactNode }> = {
         <p>heartcore is for collecting pretty, cozy, inspiring things. To keep it that way:</p>
         <ul>
           <li><b>Only post what you may share.</b> Your own photos and art, or things you have permission to post. Credit the creator when you know who it is.</li>
-          <li><b>Made by humans.</b> No AI-generated images. This is a place for real photos, real art and real moments.</li>
+          <li><b>Made by humans, not machines.</b> No AI-generated images, and no images edited with AI: no generative fill, AI filters or upscalers, face swaps or deepfakes. No composites or manipulated photos passed off as real either. Ordinary editing is fine: cropping, light and colour, black and white, film looks. This is a place for real photos, real art and real moments.</li>
           <li><b>No nudity or sexual content.</b> None at all involving anyone under 18 — that is reported to the authorities and the account is banned.</li>
           <li><b>No harassment or hate,</b> and no photos of private people posted to mock, expose or target them.</li>
           <li><b>No graphic violence</b> and nothing that promotes self-harm or eating disorders.</li>
           <li><b>No spam,</b> scams or ads.</li>
           <li><b>You must be 13 or older</b> (or the minimum age for online services in your country, if higher).</li>
         </ul>
+        <p>Uploads whose files show they were made or edited with AI are refused automatically. Everything else relies on you: if you spot an AI or manipulated image, report it. We take them down, and close accounts that keep posting them.</p>
         <p>See something that breaks these? Open the image and press <b>report</b>. We review reports and remove what breaks the rules; accounts that keep breaking them are closed.</p>
       </>
     ),
@@ -37,7 +38,7 @@ const PAGES: Record<string, { title: string; body: React.ReactNode }> = {
         <h3>What we may do</h3>
         <p>We may remove any content and close any account that breaks these terms or the rules, and we close the accounts of people who repeatedly post things that infringe copyright.</p>
         <h3>Photos from elsewhere</h3>
-        <p>Photos in Discover come from open photo libraries (Openverse or Unsplash) and belong to their creators. Each one credits its creator and links to its original. Hearting or saving a photo does not give you rights to it.</p>
+        <p>Photos in Discover come from open photo libraries (Unsplash, Flickr or Openverse) and belong to their creators. Flickr photos are shown only when their owners chose an open license or they have no known copyright restrictions. Each one credits its creator and links to its original. Hearting or saving a photo does not give you rights to it.</p>
         <h3>No guarantees</h3>
         <p>This is a free community project, provided as it is, with no promise that it will always be available or that nothing will be lost. To the extent the law allows, the people running it are not liable for losses from using it.</p>
         <h3>Contact</h3>
@@ -58,7 +59,7 @@ const PAGES: Record<string, { title: string; body: React.ReactNode }> = {
         <h3>What we don't do</h3>
         <p>No ads, no tracking, no selling or sharing your data.</p>
         <h3>Who helps run it</h3>
-        <p>Accounts, data and uploads are stored with Supabase. Discover photos are loaded from Openverse, Flickr or Unsplash, which see your IP address when your browser fetches them, as any website does. If you open the music player, it is Spotify's own player and Spotify's privacy policy applies to it; we never see your Spotify account.</p>
+        <p>Accounts, data and uploads are stored with Supabase. Discover photos are loaded from Openverse, Flickr or Unsplash, which see your IP address when your browser fetches them, as any website does. If you open the music player, it is Spotify's own player and Spotify's privacy policy applies to it; we never see your Spotify account. If you choose “connect Spotify”, the sign-in Spotify gives you is kept in your browser and only ever sent to Spotify, and you can disconnect at any time.</p>
         <h3>Your choices</h3>
         <p>You can delete any post, and you can delete your whole account from your profile — that erases your profile, posts, hearts, collections and follows. To ask for a copy of your data or anything else, write to <Contact />.</p>
       </>

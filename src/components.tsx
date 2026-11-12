@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import * as api from './api'
+import { checkImageFile } from './aicheck'
 import { Notes } from './profile'
 import { actions, fmt, heartCount, requireMe, supabase, toast, useStore, type Img } from './store'
 
@@ -33,16 +34,19 @@ export function TextCard({ body, style }: { body: string; style?: string }) {
   return <div className={`textpost ${style ?? 'ink'} ${size}`}><p>{body}</p></div>
 }
 
-export function Media({ img, onDead }: { img: Img; onDead?: () => void }) {
-  const [src, setSrc] = useState(img.url)
+/** An image, sized for a card unless `full`. Falls back to the other size, then gives up. */
+export function Media({ img, onDead, full }: { img: Img; onDead?: () => void; full?: boolean }) {
+  // Unsplash's small size is plenty for a card and loads several times faster.
+  const first = !full && img.provider !== 'upload' && img.thumb ? img.thumb : img.url
+  const second = first === img.url ? img.thumb : img.url
+  const [src, setSrc] = useState(first)
   if (img.kind === 'text') return <TextCard body={img.body ?? ''} style={img.style} />
   return (
     <img
-      src={src} alt={img.caption || 'image'} loading="lazy"
+      src={src} alt={img.caption || 'image'} loading="lazy" decoding="async"
       width={img.width} height={img.height}
       style={img.width && img.height ? { aspectRatio: `${img.width} / ${img.height}` } : undefined}
-      // Old photos disappear from their hosts; try the library's own copy, then give up.
-      onError={() => (img.thumb && src !== img.thumb ? setSrc(img.thumb) : onDead?.())}
+      onError={() => (second && src !== second ? setSrc(second) : onDead?.())}
     />
   )
 }
@@ -80,19 +84,52 @@ function Byline({ img }: { img: Img }) {
   return <span className="author">{img.credit ? `by ${img.credit}` : ''}</span>
 }
 
+/** Closes a popover when you click outside it or press Escape. */
+export function useDismiss(open: boolean, close: () => void) {
+  const ref = useRef<HTMLDivElement & HTMLElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) close() }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close() }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey) }
+  }, [open, close])
+  return ref
+}
+
+function Card({ img, onOpen, onDead, saving, setSaving }: {
+  img: Img; onOpen: (i: Img) => void; onDead: () => void; saving: boolean; setSaving: (key: string | null) => void
+}) {
+  const close = useCallback(() => setSaving(null), [setSaving])
+  const pop = useDismiss(saving, close)
+  return (
+    <article className={`card${saving ? ' saving' : ''}`} ref={pop as React.RefObject<HTMLElement>}>
+      <div className="card-frame">
+        <button className="card-media" onClick={() => onOpen(img)} aria-label={`Open ${img.caption || 'image'}`}>
+          <Media img={img} onDead={onDead} />
+        </button>
+        <button className="save-btn" aria-expanded={saving} onClick={() => requireMe() && setSaving(saving ? null : img.key)}>
+          {saving ? 'done' : 'save'}
+        </button>
+      </div>
+      {/* Outside the image frame, so a short image doesn't cut it off. */}
+      {saving && <div className="save-pop" role="dialog" aria-label="Save to a collection"><SaveToCollection img={img} /></div>}
+      <footer><Byline img={img} /><HeartButton img={img} /></footer>
+    </article>
+  )
+}
+
 export function Grid({ images, onOpen, empty }: { images: Img[]; onOpen: (i: Img) => void; empty: string }) {
   const [dead, setDead] = useState<Set<string>>(new Set())
+  const [saving, setSaving] = useState<string | null>(null)
   const shown = images.filter((i) => !dead.has(i.key))
   if (!shown.length) return <p className="empty">{empty}</p>
   return (
     <div className="grid">
       {shown.map((img) => (
-        <article key={img.key} className="card">
-          <button className="card-media" onClick={() => onOpen(img)} aria-label={`Open ${img.caption || 'image'}`}>
-            <Media img={img} onDead={() => setDead((d) => new Set(d).add(img.key))} />
-          </button>
-          <footer><Byline img={img} /><HeartButton img={img} /></footer>
-        </article>
+        <Card key={img.key} img={img} onOpen={onOpen} saving={saving === img.key} setSaving={setSaving}
+          onDead={() => setDead((d) => new Set(d).add(img.key))} />
       ))}
     </div>
   )
@@ -227,7 +264,7 @@ export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
     <Modal onClose={onClose} label="Image">
       <div className="post-modal">
         <div className="post-media" onDoubleClick={love} title="double-click to heart">
-          <Media img={img} />
+          <Media img={img} full />
           {burst > 0 && <span key={burst} className="burst"><HeartIcon filled /></span>}
         </div>
         <aside>
@@ -241,9 +278,10 @@ export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
               photo{img.credit ? <> by {img.creditUrl
                 ? <a href={img.creditUrl} target="_blank" rel="noreferrer noopener"><strong>{img.credit}</strong></a>
                 : <strong>{img.credit}</strong>}</> : ''}
-              {img.provider === 'unsplash'
-                ? <> on <a className="underline" href="https://unsplash.com/?utm_source=heartcore&utm_medium=referral" target="_blank" rel="noreferrer noopener">Unsplash</a></>
-                : img.license && <> · {img.license}</>}
+              {img.provider === 'unsplash' && <> on <a className="underline" href="https://unsplash.com/?utm_source=heartcore&utm_medium=referral" target="_blank" rel="noreferrer noopener">Unsplash</a></>}
+              {(img.provider === 'flickr' || img.provider === 'openverse') && <> on <a className="underline" href="https://www.flickr.com" target="_blank" rel="noreferrer noopener">Flickr</a></>}
+              {img.year && <> · {img.year}</>}
+              {img.provider !== 'unsplash' && img.license && <> · {img.license}</>}
               {img.sourceUrl && <> · <a href={img.sourceUrl} target="_blank" rel="noreferrer noopener">view original ↗</a></>}
             </p>
           )}
@@ -284,6 +322,8 @@ async function prepare(file: File): Promise<{ blob: Blob; width: number; height:
   return blob ? { blob, width: c.width, height: c.height } : { blob: file, width: bmp.width, height: bmp.height }
 }
 
+const aiRefusal = (marker: string) => `this image's file shows it was made or edited with AI (${marker}). heartcore is for human-made images only.`
+
 const OK_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 
 export function UploadModal({ onClose }: { onClose: () => void }) {
@@ -301,6 +341,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
   const [mode, setMode] = useState<'image' | 'words'>('image')
   const [words, setWords] = useState('')
   const [style, setStyle] = useState<string>('ink')
+  const [human, setHuman] = useState(false)
 
   useEffect(() => {
     if (!file) { setPreview(url.trim()); return }
@@ -309,10 +350,13 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
     return () => URL.revokeObjectURL(u)
   }, [file, url])
 
-  const choose = (f?: File | null) => {
+  const choose = async (f?: File | null) => {
     if (!f) return
     if (!OK_TYPES.includes(f.type)) return setError('please pick a jpg, png, gif or webp image')
     if (f.size > 15_000_000) return setError('that image is over 15 MB — try a smaller one')
+    // Before resizing, which would wipe the file's own record of how it was made.
+    const marker = await checkImageFile(f).catch(() => null)
+    if (marker) { setFile(null); return setError(aiRefusal(marker)) }
     setError(''); setUrl(''); setFile(f)
   }
 
@@ -330,6 +374,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
       } catch (err) { console.error(err); setError(`could not post that: ${errorText(err)}`); setBusy(false) }
       return
     }
+    if (!human) return setError("please confirm the image isn't AI-made or AI-edited")
     if (!file && !/^https:\/\//i.test(src)) return setError('pick an image or paste a link starting with https://')
     setBusy(true)
     try {
@@ -338,6 +383,10 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         const p = await prepare(file)
         await api.createPost(me.id, { ...common, file: p.blob, width: p.width, height: p.height })
       } else {
+        // Check the linked file too, when its host lets us read it.
+        const linked = await fetch(src, { signal: AbortSignal.timeout(8000) }).then((r) => (r.ok ? r.blob() : null)).catch(() => null)
+        const marker = linked && await checkImageFile(linked).catch(() => null)
+        if (marker) { setBusy(false); return setError(aiRefusal(marker)) }
         const el = previewEl.current
         await api.createPost(me.id, { ...common, src, width: el?.naturalWidth || undefined, height: el?.naturalHeight || undefined })
       }
@@ -396,7 +445,13 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         <label>tags
           <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="grunge, pastel, summer" />
         </label>
-        <p className="muted small">Only post things you made or have permission to share — no AI-generated images, and credit words that aren't yours — and nothing that breaks the <a className="underline" href="#/about/rules" target="_blank" rel="noreferrer">rules</a>.</p>
+        {mode === 'image' && (
+          <label className="check">
+            <input type="checkbox" checked={human} onChange={(e) => setHuman(e.target.checked)} />
+            <span>This image isn't AI-generated, AI-edited or manipulated to look real.</span>
+          </label>
+        )}
+        <p className="muted small">heartcore is human-made only. AI images are refused when their file gives them away and removed when reported. Credit words that aren't yours, and see the <a className="underline" href="#/about/rules" target="_blank" rel="noreferrer">rules</a>.</p>
         {error && <p className="error" role="alert">{error}</p>}
         <button className="primary" type="submit" disabled={busy}>{busy ? 'posting…' : 'post it ♥'}</button>
       </form>

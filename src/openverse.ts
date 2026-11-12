@@ -12,6 +12,15 @@ type OvImage = {
   width?: number; height?: number; tags?: { name: string }[]
 }
 
+/**
+ * Flickr's 640px version of a photo, for cards. Only for the sizes that share
+ * the photo's normal secret (h, k and o sizes use their own).
+ */
+export function flickrCardSize(url: string): string | undefined {
+  const m = /^(https:\/\/live\.staticflickr\.com\/\d+\/\d+_[0-9a-f]+)(?:_([mnwzcb]))?\.jpg$/.exec(url)
+  return m ? `${m[1]}_z.jpg` : undefined
+}
+
 export async function searchOpenverse(q: string, page: number): Promise<{ items: Img[]; hasMore: boolean }> {
   const u = new URL(API)
   const params: Record<string, string> = { q, page: String(page), page_size: String(PAGE_SIZE), source: 'flickr' }
@@ -37,7 +46,7 @@ export async function searchOpenverse(q: string, page: number): Promise<{ items:
       provider: 'openverse',
       providerId: r.id,
       url: r.url,
-      thumb: r.thumbnail?.startsWith('https://') ? r.thumbnail : undefined,
+      thumb: flickrCardSize(r.url),
       width: r.width || undefined,
       height: r.height || undefined,
       caption: r.title ?? '',
