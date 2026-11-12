@@ -63,3 +63,18 @@ describe('flickrCardSize', () => {
     expect(flickrCardSize('https://example.com/a_b.jpg')).toBeUndefined()
   })
 })
+
+import { dealColumns } from './components'
+
+describe('dealColumns', () => {
+  it('fills the shortest column first', () => {
+    expect(dealColumns([1, 1, 2, 1], 2, (h) => h)).toEqual([[1, 2], [1, 1]])
+  })
+  it('never moves cards that were already placed when more load', () => {
+    const first = Array.from({ length: 20 }, (_, i) => 0.5 + ((i * 37) % 10) / 10)
+    const more = [...first, ...Array.from({ length: 20 }, (_, i) => 0.5 + ((i * 53) % 10) / 10)]
+    const before = dealColumns(first.map((h, i) => ({ i, h })), 5, (x) => x.h)
+    const after = dealColumns(more.map((h, i) => ({ i, h })), 5, (x) => x.h)
+    before.forEach((col, c) => expect(after[c].slice(0, col.length)).toEqual(col))
+  })
+})

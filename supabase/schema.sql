@@ -412,3 +412,7 @@ alter table public.images add column if not exists human_made boolean not null d
 drop policy if exists "post images" on public.images;
 create policy "post images" on public.images for insert to authenticated
   with check (provider = 'upload' and uploader_id = auth.uid() and heart_count = 0 and (kind = 'text' or human_made));
+
+-- ---------- always last ----------
+-- Tell Supabase's API to pick up new columns and tables straight away.
+notify pgrst, 'reload schema';
