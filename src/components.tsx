@@ -374,7 +374,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
       } catch (err) { console.error(err); setError(`could not post that: ${errorText(err)}`); setBusy(false) }
       return
     }
-    if (!human) return setError('please confirm the image is yours to share and not AI-made or AI-edited')
+    if (!human) return setError("please confirm the image isn't AI-made or AI-edited")
     if (!file && !/^https:\/\//i.test(src)) return setError('pick an image or paste a link starting with https://')
     setBusy(true)
     try {
@@ -448,7 +448,7 @@ export function UploadModal({ onClose }: { onClose: () => void }) {
         {mode === 'image' && (
           <label className="check">
             <input type="checkbox" checked={human} onChange={(e) => setHuman(e.target.checked)} />
-            <span>I took or made this (or have permission to share it), and it isn't AI-generated, AI-edited or manipulated to look real.</span>
+            <span>This image isn't AI-generated, AI-edited or manipulated to look real.</span>
           </label>
         )}
         <p className="muted small">heartcore is human-made only. AI images are refused when their file gives them away and removed when reported. Credit words that aren't yours, and see the <a className="underline" href="#/about/rules" target="_blank" rel="noreferrer">rules</a>.</p>
