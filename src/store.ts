@@ -77,7 +77,9 @@ export function toast(message: string) {
   toastTimer = window.setTimeout(() => set({ toast: '' }), 4000)
 }
 
-export const SELECT_IMG = '*, uploader:profiles(id, username)'
+// Pictures link to people two ways, by who posted them and (through hearts)
+// by who hearted them, so the poster's link is named.
+export const SELECT_IMG = '*, uploader:profiles!images_uploader_id_fkey(id, username)'
 export function toImg(r: any, via?: string): Img {
   return {
     id: r.id,

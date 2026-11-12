@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fmt, toImg } from './store'
+import { SELECT_IMG, fmt, toImg } from './store'
 
 describe('fmt', () => {
   it('shortens big heart counts', () => {
@@ -22,5 +22,11 @@ describe('toImg', () => {
     expect(img.uploader?.username).toBe('lena')
     expect(img.via).toBe('mia')
     expect(img.tags).toEqual([])
+  })
+})
+
+describe('SELECT_IMG', () => {
+  it("names which link to profiles means the poster (hearts link them too)", () => {
+    expect(SELECT_IMG).toContain('profiles!images_uploader_id_fkey(')
   })
 })
