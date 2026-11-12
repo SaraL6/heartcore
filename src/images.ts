@@ -3,6 +3,7 @@ import { flickrEnabled, searchFlickr } from './flickr'
 import { searchOpenverse } from './openverse'
 import type { Img } from './store'
 import { searchUnsplash, unsplashEnabled } from './unsplash'
+import { newQuery, oldQuery } from './vibes'
 
 // Where Discover gets its pictures.
 // - New photos: Unsplash (needs a key).
@@ -59,6 +60,20 @@ export async function mixed(first: Search, second: Search, q: string, page: numb
   return { items: interleave(left.items, right.items), hasMore: left.hasMore || right.hasMore }
 }
 
+// Flickr's open library is full of Photoshop texture packs, and photostreams
+// come in long runs of near-identical shots.
+const NOT_PHOTOS = /\b(textures?|backgrounds?|brush(es)?|overlays?|psd|freebies?|stock)\b/i
+const PER_PERSON = 3
+export function tidyOld(items: Img[]): Img[] {
+  const seen = new Map<string, number>()
+  return items.filter((i) => {
+    if (NOT_PHOTOS.test([i.caption, ...i.tags].join(' '))) return false
+    const who = i.credit ?? ''
+    seen.set(who, (seen.get(who) ?? 0) + 1)
+    return !who || seen.get(who)! <= PER_PERSON
+  })
+}
+
 // Going back to a tag you just looked at shouldn't spend another request:
 // Unsplash allows 50 an hour until an app is approved.
 const recent = new Map<string, { at: number; page: Promise<Page> }>()
@@ -78,8 +93,12 @@ function remembered(name: string, search: Search): Search {
     return p.then(copy)
   }
 }
-const newPhotos = remembered('new', searchUnsplash)
-const oldPhotos = remembered('old', searchOld)
+const newPhotos = remembered('new', (q, page) => searchUnsplash(newQuery(q), page))
+const oldPhotos = remembered('old', async (q, page) => {
+  const pick = oldQuery(q, page)
+  const res = await searchOld(pick.q, pick.page)
+  return { hasMore: res.hasMore || page < 3, items: tidyOld(res.items) }
+})
 
 export function searchImages(q: string, page: number, source: Source = 'mix', onLate?: (p: Page) => void): Promise<Page> {
   if (!unsplashEnabled || source === 'old') return oldPhotos(q, page)

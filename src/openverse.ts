@@ -23,7 +23,7 @@ export function flickrCardSize(url: string): string | undefined {
 
 export async function searchOpenverse(q: string, page: number): Promise<{ items: Img[]; hasMore: boolean }> {
   const u = new URL(API)
-  const params: Record<string, string> = { q, page: String(page), page_size: String(PAGE_SIZE), source: 'flickr' }
+  const params: Record<string, string> = { q, page: String(page), page_size: String(PAGE_SIZE), source: 'flickr', aspect_ratio: 'tall' }
   // If the site ever earns money (ads, paid features), set this so Discover
   // leaves out photos whose license forbids commercial use.
   if (import.meta.env.VITE_COMMERCIAL_LICENSES_ONLY === 'true') params.license_type = 'commercial'

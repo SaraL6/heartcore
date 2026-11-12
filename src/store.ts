@@ -51,6 +51,7 @@ type State = {
   theme: Theme
   visitTheme: Theme | null // while looking at someone's profile, you see it their way
   quiet: boolean // hide heart counts
+  filter: boolean // the 2012 photo filter on the image wall
   music: string | null // Spotify "type/id" in the player
   musicOpen: boolean
   authOpen: boolean
@@ -60,10 +61,11 @@ type State = {
 
 const savedQuiet = (() => { try { return localStorage.getItem('heartcore:quiet') === '1' } catch { return false } })()
 const savedMusic = (() => { try { return localStorage.getItem('heartcore:music') } catch { return null } })()
+const savedFilter = (() => { try { return localStorage.getItem('heartcore:filter') !== '0' } catch { return true } })()
 const savedTheme = (() => { try { return localStorage.getItem('heartcore:theme') as Theme | null } catch { return null } })()
 let state: State = {
   ready: !supabase, me: null, isAdmin: false, hearted: {}, counts: {}, following: [], top: {},
-  theme: savedTheme ?? 'pastel', visitTheme: null, quiet: savedQuiet, music: savedMusic, musicOpen: false, authOpen: false, toast: '', rev: 0,
+  theme: savedTheme ?? 'pastel', visitTheme: null, quiet: savedQuiet, filter: savedFilter, music: savedMusic, musicOpen: false, authOpen: false, toast: '', rev: 0,
 }
 const listeners = new Set<() => void>()
 const set = (patch: Partial<State>) => { state = { ...state, ...patch }; listeners.forEach((l) => l()) }
@@ -166,6 +168,10 @@ export const actions = {
   setMusic(music: string) {
     try { localStorage.setItem('heartcore:music', music) } catch { /* private mode */ }
     set({ music, musicOpen: true })
+  },
+  toggleFilter() {
+    try { localStorage.setItem('heartcore:filter', state.filter ? '0' : '1') } catch { /* private mode */ }
+    set({ filter: !state.filter })
   },
   toggleQuiet() {
     try { localStorage.setItem('heartcore:quiet', state.quiet ? '0' : '1') } catch { /* private mode */ }

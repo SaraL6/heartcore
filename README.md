@@ -31,6 +31,9 @@ and take everything with you whenever you want.
 - **Your canvas** — pick any image as your profile cover; visitors see your
   page in the vibe you chose: pastel, darkroom, y2k chrome, soft grunge, galaxy,
   vintage or daydream
+- **The 2012 look** — topics and searches tuned to the era (fairy lights,
+  polaroids, soft grunge, film, night city), tall photos like the old
+  dashboards, and an optional per-vibe photo filter on the image wall
 - **Make it yours** — a mood, your own profile colour, a top 8 of your
   favourite people, a guestbook for friends to sign, and a little visit counter
 - **Notes** — see who else hearted an image
@@ -93,6 +96,7 @@ Supabase, so the database itself has to enforce who can do what.
 | `src/music.tsx`, `src/spotify.ts` | The music player, and Spotify sign-in (PKCE) with in-page full-song playback. |
 | `src/profile.tsx` | Profile extras: mood, colour, top 8, guestbook, visit counter. |
 | `src/App.tsx`, `src/components.tsx` | Pages and building blocks. |
+| `src/vibes.ts` | Discover's topics and how each is searched in each photo library. |
 | `src/aicheck.ts` | Spotting AI images: file fingerprints and self-described library photos. |
 | `src/legal.tsx` | Rules, terms, privacy and copyright pages. |
 | `supabase/schema.sql` | Tables, access rules, triggers, storage, reports and moderation. |

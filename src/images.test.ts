@@ -78,3 +78,20 @@ describe('dealColumns', () => {
     before.forEach((col, c) => expect(after[c].slice(0, col.length)).toEqual(col))
   })
 })
+
+import { tidyOld } from './images'
+import { oldQuery } from './vibes'
+
+describe('old photo searches', () => {
+  it('rotates a topic through its searches as you scroll', () => {
+    expect([1, 2, 3, 4].map((n) => oldQuery('soft grunge', n))).toEqual([
+      { q: 'doc martens', page: 1 }, { q: 'plaid flannel', page: 1 }, { q: 'grunge', page: 1 }, { q: 'doc martens', page: 2 },
+    ])
+    expect(oldQuery('cats', 3)).toEqual({ q: 'cats', page: 3 })
+  })
+  it('drops texture packs and long runs from one photographer', () => {
+    const img = (credit: string, caption = 'photo') => ({ key: credit + caption + Math.random(), provider: 'openverse', url: '', caption, tags: [], credit, heartCount: 0 })
+    const kept = tidyOld([img('a'), img('a'), img('a'), img('a'), img('b', 'Grunge Texture Pack'), img('c')])
+    expect(kept.map((i) => i.credit)).toEqual(['a', 'a', 'a', 'c'])
+  })
+})

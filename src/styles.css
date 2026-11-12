@@ -63,8 +63,22 @@
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 [data-theme="grunge"] body::after { opacity: 0.14; }
-[data-theme="vintage"] .card-media > img { filter: sepia(0.28) contrast(0.96) saturate(0.9); }
-[data-theme="darkroom"] .card-media > img { filter: contrast(1.04) saturate(0.92); }
+/* The 2012 photo filter: each vibe's take on the faded, tinted photos of the
+   era, on the image wall only (an opened photo is shown as taken). */
+:root { --photo-filter: contrast(0.85) brightness(1.08) saturate(0.78) sepia(0.16); --photo-tint: rgb(255 150 190 / 0.26); --vignette: rgb(40 10 30 / 0.34); }
+[data-theme="dream"] { --photo-filter: contrast(0.84) brightness(1.1) saturate(0.76) sepia(0.1); --photo-tint: rgb(190 160 255 / 0.3); }
+[data-theme="grunge"] { --photo-filter: contrast(1.12) brightness(0.94) saturate(0.62); --photo-tint: rgb(120 20 40 / 0.12); --vignette: rgb(0 0 0 / 0.55); }
+[data-theme="galaxy"] { --photo-filter: contrast(1.04) saturate(1.08) brightness(0.98); --photo-tint: rgb(150 80 255 / 0.18); --vignette: rgb(10 0 40 / 0.45); }
+[data-theme="vintage"] { --photo-filter: sepia(0.32) contrast(0.92) saturate(0.85) brightness(1.04); --photo-tint: rgb(255 200 120 / 0.14); --vignette: rgb(60 30 10 / 0.35); }
+[data-theme="darkroom"] { --photo-filter: contrast(1.08) saturate(0.78) brightness(0.96); --photo-tint: rgb(255 120 30 / 0.12); --vignette: rgb(0 0 0 / 0.5); }
+[data-theme="y2k"] { --photo-filter: contrast(1.02) saturate(1.12) brightness(1.05); --photo-tint: rgb(120 200 255 / 0.16); --vignette: rgb(10 20 60 / 0.25); }
+[data-filter="on"] .card-media > img { filter: var(--photo-filter); }
+[data-filter="on"] .card-frame::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, var(--vignette)), linear-gradient(var(--photo-tint), var(--photo-tint));
+  mix-blend-mode: soft-light;
+}
+[data-filter="on"] .card-frame:has(.textpost)::before { display: none; }
 
 * { box-sizing: border-box; }
 html { background: var(--bg); }
@@ -121,6 +135,9 @@ input { background: var(--card); border: 1px solid var(--line); border-radius: v
 .vibe-pop button:hover { background: var(--chip); color: var(--ink); }
 .vibe-pop button[aria-pressed="true"] { background: var(--chip); }
 .vibe-pop .swatch { width: 26px; height: 26px; }
+.filter-toggle { display: flex; align-items: flex-start; gap: 12px; padding: 8px 10px 12px; margin-bottom: 4px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.filter-toggle input { width: 18px; height: 18px; margin: 3px 4px 0; accent-color: var(--accent); }
+.filter-toggle small { display: block; color: var(--muted); font-size: 12px; }
 .vibe-pop small { display: block; color: var(--muted); font-size: 12px; }
 
 main { max-width: 1400px; margin: 0 auto; padding: 18px max(20px, env(safe-area-inset-right, 0px)) 80px max(20px, env(safe-area-inset-left, 0px)); min-height: 70vh; }
