@@ -23,6 +23,7 @@ export type Img = {
   tags: string[]
   credit?: string
   creditUrl?: string
+  year?: string // when the photo was taken, if the library knows
   sourceUrl?: string
   license?: string
   uploader?: { id: string; username: string }

@@ -133,6 +133,10 @@ main { max-width: 1400px; margin: 0 auto; padding: 18px max(20px, env(safe-area-
 .hero h1 em { color: var(--accent); }
 [data-theme="y2k"] .hero h1 em { font-style: normal; background: linear-gradient(90deg, #3355ff, #b06bff 60%, #00c2ff); -webkit-background-clip: text; background-clip: text; color: transparent; }
 .hero p:last-child { margin: 0; max-width: 54ch; color: var(--muted); font-size: 16px; }
+.source { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; margin: 0 0 12px; border-radius: 99px; background: var(--chip); }
+.source button { border: 0; border-radius: 99px; padding: 6px 14px; color: var(--muted); font-weight: 500; }
+.source button:hover { color: var(--ink); }
+.source button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 .chips { display: flex; align-items: center; gap: 8px; overflow-x: auto; padding: 2px 0 18px; scrollbar-width: none; }
 .chip-label { flex: none; margin-right: 6px; font: 12px var(--mono); color: var(--muted); }
 .chip-label b { color: var(--ink); font-weight: 600; }

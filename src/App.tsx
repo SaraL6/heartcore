@@ -4,7 +4,8 @@ import { AuthModal, FollowButton, Grid, HeartIcon, Media, PostModal, UploadModal
 import { LEGAL_LINKS, LegalPage } from './legal'
 import { MUSIC_REF, MusicPlayer } from './music'
 import { AboutBox, Guestbook, TopButton, TopFriends, useAccent } from './profile'
-import { LIBRARY, searchImages } from './images'
+import { flickrEnabled } from './flickr'
+import { LIBRARIES, canChooseSource, searchImages, type Source } from './images'
 import { actions, initAuth, requireMe, supabase, toast, useStore, type Collection, type Img, type Profile, type Theme } from './store'
 
 function useRoute() {
@@ -41,6 +42,10 @@ export default function App() {
   const [open, setOpen] = useState<Img | null>(null)
   const [uploading, setUploading] = useState(false)
   const [query, setQuery] = useState('')
+  const [source, setSourceState] = useState<Source>(() => {
+    try { const v = localStorage.getItem('heartcore:source'); return v === 'new' || v === 'old' ? v : 'mix' } catch { return 'mix' }
+  })
+  const setSource = (v: Source) => { try { localStorage.setItem('heartcore:source', v) } catch { /* private mode */ } setSourceState(v) }
 
   useEffect(() => { initAuth() }, [])
   const shownTheme = s.visitTheme ?? s.theme
@@ -54,7 +59,7 @@ export default function App() {
   else if (section === 'about') page = <LegalPage page={arg} />
   else if (section === 'admin') page = <AdminPage />
   else if (section === 'c') page = <CollectionPage key={arg} id={arg} onOpen={setOpen} />
-  else page = <Discover key={`${section}/${arg}`} q={section === 'tag' || section === 'search' ? arg : ''} isTag={section === 'tag'} onOpen={setOpen} />
+  else page = <Discover key={`${section}/${arg}/${source}`} q={section === 'tag' || section === 'search' ? arg : ''} isTag={section === 'tag'} onOpen={setOpen} source={source} setSource={setSource} />
 
   const meHref = s.me ? `#/u/${s.me.username}` : undefined
   const current = section === 'friends' ? 'friends' : section === 'u' && arg === s.me?.username ? 'me' : ['u', 'c', 'about', 'admin'].includes(section) ? '' : 'discover'
@@ -83,7 +88,9 @@ export default function App() {
       </header>
       <main>{page}</main>
       <footer className="foot">
-        made with ♥ for the tumblr kids · no ads, no tracking, ever · photos from <a href={LIBRARY.url} target="_blank" rel="noreferrer noopener">{LIBRARY.name}</a>, {LIBRARY.note}
+        made with ♥ for the tumblr kids · no ads, no tracking, ever · photos from{' '}
+        {LIBRARIES.map((l, i) => <span key={l.name}>{i > 0 && ' and '}<a href={l.url} target="_blank" rel="noreferrer noopener">{l.name}</a></span>)}, shared by their creators
+        {flickrEnabled && <><br />This product uses the Flickr API but is not endorsed or certified by SmugMug, Inc.</>}
         <nav>
           {LEGAL_LINKS.map(([path, label]) => <a key={path} href={`#/about/${path}`}>{label}</a>)}
           <button className="link" aria-pressed={s.quiet} onClick={actions.toggleQuiet}>{s.quiet ? 'show heart counts' : 'hide heart counts'}</button>
@@ -127,7 +134,7 @@ function Tabs({ base, tabs, current }: { base: string; tabs: [string, string][];
 
 // ---------- discover: browse the outside image library ----------
 
-function Discover({ q, isTag, onOpen }: { q: string; isTag: boolean; onOpen: Open }) {
+function Discover({ q, isTag, onOpen, source, setSource }: { q: string; isTag: boolean; onOpen: Open; source: Source; setSource: (s: Source) => void }) {
   const term = q || homeVibe
   const [items, setItems] = useState<Img[]>([])
   const [page, setPage] = useState(1)
@@ -142,7 +149,7 @@ function Discover({ q, isTag, onOpen }: { q: string; isTag: boolean; onOpen: Ope
     busy.current = true
     setLoading(true); setError('')
     try {
-      const res = await searchImages(term, n)
+      const res = await searchImages(term, n, source)
       // Fill in hearts from people here before showing the batch.
       const known = await api.lookupExternal(res.items).catch(() => [])
       const ids = new Map(known.map((k) => [k.key, k.id]))
@@ -184,6 +191,13 @@ function Discover({ q, isTag, onOpen }: { q: string; isTag: boolean; onOpen: Ope
             <p>Your own corner of the internet, like it's 2012 again. Heart it, save it to a board, share it with friends.</p>
           </section>
         )}
+      {canChooseSource && (
+        <div className="source" role="group" aria-label="Which photos">
+          {([['mix', 'everything'], ['new', 'new photos'], ['old', 'old photos · Flickr']] as const).map(([v, label]) => (
+            <button key={v} aria-pressed={source === v} onClick={() => setSource(v)}>{label}</button>
+          ))}
+        </div>
+      )}
       <nav className="chips" aria-label="Topics">
         {!q && <span className="chip-label">today's vibe: <b>#{homeVibe}</b></span>}
         {VIBES.map((t) => <a key={t} href={`#/tag/${encodeURIComponent(t)}`} className={q === t ? 'on' : ''}>#{t}</a>)}

@@ -36,7 +36,7 @@ export function TextCard({ body, style }: { body: string; style?: string }) {
 /** An image, sized for a card unless `full`. Falls back to the other size, then gives up. */
 export function Media({ img, onDead, full }: { img: Img; onDead?: () => void; full?: boolean }) {
   // Unsplash's small size is plenty for a card and loads several times faster.
-  const first = !full && img.provider === 'unsplash' && img.thumb ? img.thumb : img.url
+  const first = !full && (img.provider === 'unsplash' || img.provider === 'flickr') && img.thumb ? img.thumb : img.url
   const second = first === img.url ? img.thumb : img.url
   const [src, setSrc] = useState(first)
   if (img.kind === 'text') return <TextCard body={img.body ?? ''} style={img.style} />
@@ -277,9 +277,10 @@ export function PostModal({ img, onClose }: { img: Img; onClose: () => void }) {
               photo{img.credit ? <> by {img.creditUrl
                 ? <a href={img.creditUrl} target="_blank" rel="noreferrer noopener"><strong>{img.credit}</strong></a>
                 : <strong>{img.credit}</strong>}</> : ''}
-              {img.provider === 'unsplash'
-                ? <> on <a className="underline" href="https://unsplash.com/?utm_source=heartcore&utm_medium=referral" target="_blank" rel="noreferrer noopener">Unsplash</a></>
-                : img.license && <> · {img.license}</>}
+              {img.provider === 'unsplash' && <> on <a className="underline" href="https://unsplash.com/?utm_source=heartcore&utm_medium=referral" target="_blank" rel="noreferrer noopener">Unsplash</a></>}
+              {img.provider === 'flickr' && <> on <a className="underline" href="https://www.flickr.com" target="_blank" rel="noreferrer noopener">Flickr</a></>}
+              {img.year && <> · {img.year}</>}
+              {img.provider !== 'unsplash' && img.license && <> · {img.license}</>}
               {img.sourceUrl && <> · <a href={img.sourceUrl} target="_blank" rel="noreferrer noopener">view original ↗</a></>}
             </p>
           )}

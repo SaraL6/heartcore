@@ -14,12 +14,17 @@ const dedupe = (imgs: Img[]) => [...new Map(imgs.map((i) => [i.key, i])).values(
 
 /** For library search results: hearts from people here, and anything taken down here. */
 export async function lookupExternal(items: Img[]) {
-  const ids = items.filter((i) => i.providerId).map((i) => i.providerId!)
-  if (!supabase || !ids.length) return []
-  const { data } = await supabase.rpc('external_status', { p_provider: items[0].provider, p_ids: ids })
-  return ((data ?? []) as any[]).map((r) => ({
-    key: `${items[0].provider}:${r.provider_id}`, id: r.id as string, heartCount: r.heart_count as number, removed: !!r.removed,
+  if (!supabase) return []
+  // A page can mix libraries, so ask about each library's pictures separately.
+  const byProvider = new Map<string, string[]>()
+  for (const i of items) if (i.providerId) byProvider.set(i.provider, [...(byProvider.get(i.provider) ?? []), i.providerId])
+  const found = await Promise.all([...byProvider].map(async ([provider, ids]) => {
+    const { data } = await supabase!.rpc('external_status', { p_provider: provider, p_ids: ids })
+    return ((data ?? []) as any[]).map((r) => ({
+      key: `${provider}:${r.provider_id}`, id: r.id as string, heartCount: r.heart_count as number, removed: !!r.removed,
+    }))
   }))
+  return found.flat()
 }
 
 export async function friendsFeed(following: string[]): Promise<Img[]> {

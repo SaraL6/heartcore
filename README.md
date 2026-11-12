@@ -19,8 +19,9 @@ and take everything with you whenever you want.
 
 ## What it does
 
-- **Discover** — endless scroll of real photos with search, from Unsplash or
-  Openverse, across topics for every kind of curator: streetwear, sneakers,
+- **Discover** — endless scroll of real photos with search: new ones from
+  Unsplash mixed with old ones from Flickr (or just one, at the flick of a
+  switch), or Openverse when neither is set up, across topics for every kind of curator: streetwear, sneakers,
   cars, architecture, interiors, film photography, tattoos, vinyl and more
 - **Hearts and collections** — heart anything, or hit **save** on any image
   to drop it straight into a collection, Pinterest-style
@@ -79,7 +80,7 @@ Supabase, so the database itself has to enforce who can do what.
 | --- | --- |
 | `src/store.ts` | Signed-in state: who you are, what you've hearted, who you follow. |
 | `src/api.ts` | Every other database read and write, and the export. |
-| `src/images.ts`, `src/openverse.ts`, `src/unsplash.ts` | Image search: Unsplash if a key is set, otherwise Openverse. |
+| `src/images.ts`, `src/unsplash.ts`, `src/flickr.ts`, `src/openverse.ts` | Image search: mixes Unsplash and Flickr when both keys are set, otherwise whichever is set, otherwise Openverse. |
 | `src/music.tsx`, `src/spotify.ts` | The music player, and Spotify sign-in (PKCE) with in-page full-song playback. |
 | `src/profile.tsx` | Profile extras: mood, colour, top 8, guestbook, visit counter. |
 | `src/App.tsx`, `src/components.tsx` | Pages and building blocks. |
@@ -126,6 +127,17 @@ Good to know:
   **Authentication → URL Configuration** so confirmation links come back to it.
 - The anon key is safe to ship in the site. Never put the `service_role` key
   in `.env.local` or anywhere in this repo.
+
+## Old photos from Flickr (optional)
+
+1. Sign in at [flickr.com](https://www.flickr.com), open
+   [the App Garden](https://www.flickr.com/services/apps/create/apply/) and
+   apply for a **non-commercial** key.
+2. Set the **Key** (never the secret) as `VITE_FLICKR_API_KEY`, then redeploy.
+
+Discover then mixes in Flickr photos uploaded before 2016, and only ones whose
+owners chose an open license or that have no known copyright restrictions. The
+footer carries the notice Flickr's API terms ask for.
 
 ## Full songs with Spotify (optional)
 
